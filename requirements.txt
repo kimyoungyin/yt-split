@@ -1,0 +1,6 @@
+torch
+psutil
+yt-dlp
+demucs
+ffmpeg-python
+pytest

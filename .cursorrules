@@ -1,0 +1,45 @@
+# Audio-Separator-AI Cursor Rules
+
+## AI Behavior & Context
+
+- Always follow the Feature-Sliced Design (FSD) architecture defined in the project.
+
+- Mandatory: Include hardware validation before any AI inference tasks.
+
+- Language: Technical comments in English, user-facing logs/messages in Korean.
+
+## Technical Constraints
+
+- Python 3.10+ with strict type hinting.
+
+- Use `subprocess` for `yt-dlp` and `ffmpeg` with proper error handling.
+
+- Default AI model: Meta's `htdemucs` (4-stem).
+
+## Critical Hardware Check Logic
+
+Before starting separation:
+
+1. Check `torch.cuda.is_available()`.
+
+2. If GPU is unavailable, prompt the user in Korean: "GPU를 찾을 수 없습니다. CPU 모드는 매우 느립니다(곡당 10~20분). 진행하시겠습니까?"
+
+3. Check system RAM; warn if < 8GB.
+
+## Coding Standards
+
+- Functions/Variables: `snake_case`
+
+- Classes: `PascalCase`
+
+- Constants: `UPPER_SNAKE_CASE`
+
+- Always use `Path` from `pathlib` for file operations.
+
+## Commands Reference
+
+- Diagnostic: `python main.py --check`
+
+- Full Process: `python main.py --url [URL]`
+
+- Stem Specific: `python main.py --url [URL] --stem [vocal|drums|bass]`
