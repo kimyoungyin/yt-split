@@ -92,3 +92,30 @@ def test_separate_audio_prints_both_streams_when_both_set_on_failure(
     captured = capsys.readouterr()
     assert err_part in captured.out
     assert out_part in captured.out
+
+
+def test_separate_audio_uses_demucs_device_cpu_when_use_gpu_false(monkeypatch, tmp_path):
+    """Demucs 4.x는 --cpu 대신 -d cpu로 CPU를 지정한다."""
+    input_file = tmp_path / "cpu.mp3"
+    input_file.touch()
+    output_dir = tmp_path / "out_cpu"
+    output_dir.mkdir()
+
+    captured_cmd: list[str] | None = None
+
+    def fake_run(cmd, **kwargs):
+        nonlocal captured_cmd
+        captured_cmd = list(cmd)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("src.features.separation.subprocess.run", fake_run)
+
+    from src.features.separation import separate_audio
+
+    ok = separate_audio(input_file, output_dir, stems=None, use_gpu=False)
+
+    assert ok is True
+    assert captured_cmd is not None
+    assert "--cpu" not in captured_cmd
+    d_idx = captured_cmd.index("-d")
+    assert captured_cmd[d_idx + 1] == "cpu"

@@ -30,9 +30,9 @@ def separate_audio(
     if stems:
         cmd.extend(["--two-stems", stems])
 
-    # Force CPU if GPU is not available
+    # Force CPU if GPU is not available (Demucs 4.x: -d/--device, not --cpu)
     if not use_gpu:
-        cmd.append("--cpu")
+        cmd.extend(["-d", "cpu"])
 
     try:
         print(f"분리 시작: {input_file.name}")

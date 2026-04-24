@@ -81,6 +81,7 @@ def test_main_prints_korean_error_and_exits_when_pipeline_fails(monkeypatch, cap
             "ram_gb": 16.0,
         },
     )
+    monkeypatch.setattr("src.app.main.ensure_bundled_ffmpeg_on_path", lambda: None)
     monkeypatch.setattr("src.app.main.run_pipeline", lambda **kwargs: False)
 
     from src.app.main import main

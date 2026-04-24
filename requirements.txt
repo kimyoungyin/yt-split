@@ -3,4 +3,5 @@ psutil
 yt-dlp
 demucs
 ffmpeg-python
+static-ffmpeg
 pytest
