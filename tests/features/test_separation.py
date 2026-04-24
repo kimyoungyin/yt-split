@@ -25,7 +25,7 @@ def test_separate_audio_prints_subprocess_stderr_on_demucs_failure(
 
     from src.features.separation import separate_audio
 
-    ok = separate_audio(input_file, output_dir, stems=None, use_gpu=True)
+    ok = separate_audio(input_file, output_dir, stems=None, device="cuda")
 
     assert ok is False
     assert run_kwargs.get("capture_output") is True
@@ -56,7 +56,7 @@ def test_separate_audio_prints_subprocess_stdout_when_stderr_empty_on_failure(
 
     from src.features.separation import separate_audio
 
-    ok = separate_audio(input_file, output_dir, stems=None, use_gpu=True)
+    ok = separate_audio(input_file, output_dir, stems=None, device="cuda")
 
     assert ok is False
     captured = capsys.readouterr()
@@ -86,7 +86,7 @@ def test_separate_audio_prints_both_streams_when_both_set_on_failure(
 
     from src.features.separation import separate_audio
 
-    ok = separate_audio(input_file, output_dir, stems=None, use_gpu=True)
+    ok = separate_audio(input_file, output_dir, stems=None, device="cuda")
 
     assert ok is False
     captured = capsys.readouterr()
@@ -94,8 +94,8 @@ def test_separate_audio_prints_both_streams_when_both_set_on_failure(
     assert out_part in captured.out
 
 
-def test_separate_audio_uses_demucs_device_cpu_when_use_gpu_false(monkeypatch, tmp_path):
-    """Demucs 4.x는 --cpu 대신 -d cpu로 CPU를 지정한다."""
+def test_separate_audio_uses_demucs_device_cpu_when_device_cpu(monkeypatch, tmp_path):
+    """Demucs 4.x: -d cpu로 CPU를 지정한다."""
     input_file = tmp_path / "cpu.mp3"
     input_file.touch()
     output_dir = tmp_path / "out_cpu"
@@ -112,7 +112,7 @@ def test_separate_audio_uses_demucs_device_cpu_when_use_gpu_false(monkeypatch, t
 
     from src.features.separation import separate_audio
 
-    ok = separate_audio(input_file, output_dir, stems=None, use_gpu=False)
+    ok = separate_audio(input_file, output_dir, stems=None, device="cpu")
 
     assert ok is True
     assert captured_cmd is not None

@@ -8,8 +8,8 @@ def test_run_pipeline_calls_download_then_separation(monkeypatch, tmp_path):
         calls.append(("download", url, output_path))
         return fake_downloaded
 
-    def fake_separate(input_file, output_dir, stems, use_gpu):
-        calls.append(("separate", input_file, output_dir, stems, use_gpu))
+    def fake_separate(input_file, output_dir, stems, device):
+        calls.append(("separate", input_file, output_dir, stems, device))
         return True
 
     monkeypatch.setattr("src.app.main.download_audio", fake_download)
@@ -20,7 +20,7 @@ def test_run_pipeline_calls_download_then_separation(monkeypatch, tmp_path):
     ok = run_pipeline(
         url="https://youtu.be/abc",
         stem=None,
-        use_gpu=False,
+        device="cpu",
         base_dir=tmp_path,
     )
 
@@ -30,7 +30,7 @@ def test_run_pipeline_calls_download_then_separation(monkeypatch, tmp_path):
     assert calls[0][1] == "https://youtu.be/abc"
     assert calls[1][0] == "separate"
     assert calls[1][1] == fake_downloaded
-    assert calls[1][4] is False
+    assert calls[1][4] == "cpu"
 
 
 def test_run_pipeline_returns_false_when_download_fails(monkeypatch, tmp_path):
@@ -41,7 +41,7 @@ def test_run_pipeline_returns_false_when_download_fails(monkeypatch, tmp_path):
         calls.append("download")
         return None
 
-    def fake_separate(input_file, output_dir, stems, use_gpu):
+    def fake_separate(input_file, output_dir, stems, device):
         calls.append("separate")
         return True
 
@@ -53,7 +53,7 @@ def test_run_pipeline_returns_false_when_download_fails(monkeypatch, tmp_path):
     ok = run_pipeline(
         url="https://youtu.be/bad",
         stem=None,
-        use_gpu=False,
+        device="cpu",
         base_dir=tmp_path,
     )
 
@@ -78,6 +78,8 @@ def test_main_prints_korean_error_and_exits_when_pipeline_fails(monkeypatch, cap
             "can_run": True,
             "warning": "",
             "cuda_available": False,
+            "mps_available": False,
+            "demucs_device": "cpu",
             "ram_gb": 16.0,
         },
     )

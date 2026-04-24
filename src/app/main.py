@@ -12,7 +12,7 @@ from src.features.system import check_hardware_compatibility
 def run_pipeline(
     url: str,
     stem: Optional[str],
-    use_gpu: bool,
+    device: str,
     base_dir: Path,
 ) -> bool:
     """Download audio from URL then run stem separation. Returns True on success."""
@@ -25,7 +25,7 @@ def run_pipeline(
     if downloaded is None:
         return False
 
-    return separate_audio(downloaded, output_dir, stem, use_gpu)
+    return separate_audio(downloaded, output_dir, stem, device)
 
 
 def main() -> None:
@@ -41,6 +41,8 @@ def main() -> None:
     if args.check:
         print("--- Hardware Status ---")
         print(f"CUDA: {stats['cuda_available']}")
+        print(f"MPS: {stats['mps_available']}")
+        print(f"Demucs device: {stats['demucs_device']}")
         print(f"RAM: {stats['ram_gb']:.2f} GB")
         if stats['warning']:
             print(f"Messages: {stats['warning']}")
@@ -61,7 +63,7 @@ def main() -> None:
         ok = run_pipeline(
             url=args.url,
             stem=args.stem,
-            use_gpu=stats["cuda_available"],
+            device=stats["demucs_device"],
             base_dir=Path.cwd(),
         )
         if not ok:

@@ -31,11 +31,11 @@ High-performance local utility for extracting audio from YouTube URLs and separa
 
 System check via `src/features/system` runs before processing a URL:
 
-1. CUDA Check: Verify `torch.cuda.is_available()`.
-    - If missing: Warn user about CPU fallback and significant latency (10-20m per song). Require confirmation.
+1. Accelerator for Demucs: resolve `demucs_device` in order **CUDA, then MPS (macOS Apple GPU via `torch.backends.mps`), else CPU**, and pass it to `demucs.separate` as `-d`. If the result is CPU only, warn about slow runtime and (with RAM or disk issues) require confirmation as today.
 
 2. RAM/VRAM Check:
-    - GPU: 4GB+ VRAM recommended.
+    - NVIDIA CUDA: VRAM as reported by PyTorch when CUDA is available.
+    - macOS MPS: no separate VRAM figure in stats today; RAM still listed.
     - System: Warn if RAM < 8GB to prevent OOM crashes.
 
 3. Storage Check: Ensure space for model weights (~2GB) and high-quality output files. Under 5GB free space blocks execution.

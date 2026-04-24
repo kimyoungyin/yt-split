@@ -8,10 +8,11 @@ def separate_audio(
     input_file: Path,
     output_dir: Path,
     stems: Optional[str] = None,
-    use_gpu: bool = False
+    device: str = "cpu",
 ) -> bool:
     """
     Separates audio into stems using Meta's Demucs.
+    `device` is passed to demucs as `-d` (e.g. cpu, cuda, mps).
     """
     if not input_file.exists():
         print(f"오류: 입력 파일이 없습니다: {input_file}")
@@ -30,9 +31,7 @@ def separate_audio(
     if stems:
         cmd.extend(["--two-stems", stems])
 
-    # Force CPU if GPU is not available (Demucs 4.x: -d/--device, not --cpu)
-    if not use_gpu:
-        cmd.extend(["-d", "cpu"])
+    cmd.extend(["-d", device])
 
     try:
         print(f"분리 시작: {input_file.name}")
