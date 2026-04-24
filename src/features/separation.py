@@ -46,7 +46,7 @@ def separate_audio(
         print("오류: Demucs 프로세스가 실패했습니다.")
         if result.stderr:
             print(result.stderr)
-        elif result.stdout:
+        if result.stdout:
             print(result.stdout)
         return False
 

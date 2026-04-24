@@ -61,3 +61,34 @@ def test_separate_audio_prints_subprocess_stdout_when_stderr_empty_on_failure(
     assert ok is False
     captured = capsys.readouterr()
     assert out_text in captured.out
+
+
+def test_separate_audio_prints_both_streams_when_both_set_on_failure(
+    monkeypatch, tmp_path, capsys
+):
+    """실패 시 stderr와 stdout이 모두 비어 있지 않으면 둘 다 사용자에게 보여야 한다."""
+    input_file = tmp_path / "clip3.mp3"
+    input_file.touch()
+    output_dir = tmp_path / "out3"
+    output_dir.mkdir()
+
+    err_part = "stderr-fragment-77"
+    out_part = "stdout-fragment-88"
+
+    def fake_run(cmd, **kwargs):
+        return SimpleNamespace(
+            returncode=1,
+            stdout=out_part,
+            stderr=err_part,
+        )
+
+    monkeypatch.setattr("src.features.separation.subprocess.run", fake_run)
+
+    from src.features.separation import separate_audio
+
+    ok = separate_audio(input_file, output_dir, stems=None, use_gpu=True)
+
+    assert ok is False
+    captured = capsys.readouterr()
+    assert err_part in captured.out
+    assert out_part in captured.out
