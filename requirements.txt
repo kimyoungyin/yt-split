@@ -1,4 +1,5 @@
 torch
+torchcodec
 psutil
 yt-dlp
 demucs

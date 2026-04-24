@@ -7,13 +7,14 @@ High-performance local utility for extracting audio from YouTube URLs and separa
 ## Tech Stack
 
 - Core: Python 3.10+, PyTorch
-- Libraries: yt-dlp, demucs, ffmpeg-python, static-ffmpeg (bundled ffmpeg/ffprobe on `PATH` when processing `--url` if missing)
+- Libraries: yt-dlp, demucs, ffmpeg-python, static-ffmpeg (bundled ffmpeg/ffprobe on `PATH` when processing `--url` if missing), torchcodec (with system FFmpeg shared libs for Demucs output; see Prerequisites)
 - Architecture: Feature-Sliced Design (FSD)
 
 ## Prerequisites
 
 - Run all CLI examples from the **repository root** so `src` imports resolve.
 - **ffmpeg / ffprobe**: `pip install -r requirements.txt` pulls in **static-ffmpeg**. On `--url`, the app calls `static_ffmpeg.add_paths(weak=True)` so bundled binaries are used when nothing is on `PATH` (first use may download platform binaries; needs network). If you already have system ffmpeg, it stays preferred. `ffmpeg-python` alone does not ship the ffmpeg binary.
+- **Demucs output (torchaudio / torchcodec)**: writing stems needs **FFmpeg shared libraries** (e.g. `libavutil`). On macOS run `brew install ffmpeg` (typical `lib` paths: Apple Silicon `/opt/homebrew/opt/ffmpeg/lib`, Intel Homebrew `/usr/local/opt/ffmpeg/lib`); the app prepends `DYLD_LIBRARY_PATH` when that directory exists. On Linux install the distro `ffmpeg` package (e.g. Debian/Ubuntu: `apt install ffmpeg`). See [README](./README.md) for Windows and links. `static-ffmpeg` alone does not replace these shared libs.
 - After `pip install -r requirements.txt`, first run is slow while Demucs may download model weights (on the order of ~2GB disk for caches; keep headroom for outputs too).
 - `src/features/system.py` refuses to run if free disk under the current working directory is below **5GB**.
 
@@ -21,7 +22,7 @@ High-performance local utility for extracting audio from YouTube URLs and separa
 
 - `src/app/main.py`: CLI entry (`python -m src.app.main` from repo root)
 - `src/features/download`: YouTube audio extraction
-- `src/features/ffmpeg_env`: Optional bundled ffmpeg/ffprobe via `static-ffmpeg` for `--url`
+- `src/features/ffmpeg_env`: Bundled ffmpeg via `static-ffmpeg` for `--url`, plus linker path for **torchcodec** (system FFmpeg `lib` dirs); `system_has_ffmpeg_shared_libs_for_torchcodec()` for detection
 - `src/features/separation`: AI model inference (Demucs)
 - `src/features/system`: Environment and hardware validation
 - `downloads/`, `output/`: Created under **current working directory** when you run the app (not committed)

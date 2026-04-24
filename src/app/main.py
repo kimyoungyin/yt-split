@@ -4,7 +4,10 @@ from pathlib import Path
 from typing import Optional
 
 from src.features.download import download_audio
-from src.features.ffmpeg_env import ensure_bundled_ffmpeg_on_path
+from src.features.ffmpeg_env import (
+    ensure_bundled_ffmpeg_on_path,
+    ensure_shared_ffmpeg_for_torchcodec,
+)
 from src.features.separation import separate_audio
 from src.features.system import check_hardware_compatibility
 
@@ -60,6 +63,7 @@ def main() -> None:
 
     if args.url:
         ensure_bundled_ffmpeg_on_path()
+        ensure_shared_ffmpeg_for_torchcodec()
         ok = run_pipeline(
             url=args.url,
             stem=args.stem,
