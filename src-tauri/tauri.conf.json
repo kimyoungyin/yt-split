@@ -1,0 +1,32 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "productName": "yt-split",
+    "version": "0.1.0",
+    "identifier": "com.ytsplit.app",
+    "build": {
+        "beforeDevCommand": "pnpm --dir ../ui dev",
+        "beforeBuildCommand": "pnpm --dir ../ui build",
+        "devUrl": "http://localhost:5173",
+        "frontendDist": "../ui/dist"
+    },
+    "app": {
+        "windows": [
+            {
+                "title": "yt-split",
+                "width": 960,
+                "height": 640,
+                "resizable": true,
+                "fullscreen": false
+            }
+        ],
+        "security": {
+            "csp": null
+        }
+    },
+    "bundle": {
+        "active": true,
+        "targets": "all",
+        "icon": ["icons/icon.png"],
+        "resources": []
+    }
+}

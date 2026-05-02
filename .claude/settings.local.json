@@ -1,0 +1,9 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(cargo --version)",
+            "Bash(pnpm --version)",
+            "Bash(npm --version)"
+        ]
+    }
+}

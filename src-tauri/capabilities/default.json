@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capabilities the main webview needs to invoke our sidecar pipeline.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:default"
+  ]
+}
