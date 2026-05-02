@@ -3,3 +3,15 @@ __pycache__/
 *.pyc
 output/
 downloads/
+
+# PyInstaller
+build/
+dist/
+
+# Tauri sidecar binaries (built locally; produced by pyinstaller/build.sh)
+src-tauri/binaries/
+src-tauri/target/
+
+# Frontend
+ui/node_modules/
+ui/dist/
