@@ -1,0 +1,1 @@
+{"root":["./src/main.tsx","./src/app/app.tsx","./src/features/separate-audio/api/sidecar.ts","./src/features/separate-audio/model/events.ts","./src/features/separate-audio/model/store.ts","./src/features/separate-audio/ui/pipelinerunner.tsx"],"version":"5.9.3"}
