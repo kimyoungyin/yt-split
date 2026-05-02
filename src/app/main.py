@@ -39,7 +39,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    stats = check_hardware_compatibility()
+    stats = check_hardware_compatibility(check_path=Path.cwd())
 
     if args.check:
         print("--- Hardware Status ---")

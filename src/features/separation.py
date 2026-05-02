@@ -37,7 +37,7 @@ def separate_audio(
         print(f"분리 시작: {input_file.name}")
         print("하드웨어에 따라 시간이 오래 걸릴 수 있습니다...")
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=3600)
 
         if result.returncode == 0:
             print(f"분리가 완료되었습니다. 결과 경로: {output_dir}")

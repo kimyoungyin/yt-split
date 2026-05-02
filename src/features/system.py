@@ -1,7 +1,8 @@
 import shutil
 import torch
 import psutil
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 
 def _resolve_demucs_device() -> str:
@@ -13,10 +14,13 @@ def _resolve_demucs_device() -> str:
     return "cpu"
 
 
-def check_hardware_compatibility() -> Dict[str, Any]:
+def check_hardware_compatibility(check_path: Optional[Path] = None) -> Dict[str, Any]:
     """
     하드웨어 사양을 체크하고 실행 가능 여부를 반환합니다.
+    check_path: 디스크 여유 공간을 확인할 경로 (기본값: 현재 작업 디렉터리)
     """
+    if check_path is None:
+        check_path = Path.cwd()
     cuda_available = torch.cuda.is_available()
     mps_mod = getattr(torch.backends, "mps", None)
     mps_available = bool(
@@ -30,12 +34,12 @@ def check_hardware_compatibility() -> Dict[str, Any]:
         "demucs_device": demucs_device,
         "vram_gb": 0.0,
         "ram_gb": psutil.virtual_memory().total / (1024**3),
-        "free_space_gb": shutil.disk_usage(".").free / (1024**3),
+        "free_space_gb": shutil.disk_usage(check_path).free / (1024**3),
         "can_run": True,
         "warning": "",
     }
 
-    if cuda_available:
+    if cuda_available and torch.cuda.device_count() > 0:
         stats["vram_gb"] = torch.cuda.get_device_properties(0).total_memory / (1024**3)
 
     if demucs_device == "cpu":
