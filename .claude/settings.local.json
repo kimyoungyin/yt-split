@@ -3,7 +3,8 @@
         "allow": [
             "Bash(cargo --version)",
             "Bash(pnpm --version)",
-            "Bash(npm --version)"
+            "Bash(npm --version)",
+            "Bash(otool -L /Users/kim-young-yin/Documents/codes/yt-split/.venv/lib/python3.14/site-packages/torchcodec/libtorchcodec_core8.dylib)"
         ]
     }
 }
