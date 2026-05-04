@@ -69,7 +69,7 @@ From the repository root:
 
 ## Tauri Desktop App (Phase 1 완료)
 
-The Python pipeline above is also exposed as a sidecar binary embedded in a Tauri v2 + React desktop app. Phase 1 verified the end-to-end flow on macOS arm64; multi-track player, project library, shadcn UI, Windows/Linux builds, and CI are deferred. **See [`docs/phase-1.md`](./docs/phase-1.md) for the full plan, the implementation deltas, and the known quirks.**
+The Python pipeline above is also exposed as a sidecar binary embedded in a Tauri v2 + React desktop app. Phase 1 verified the end-to-end flow on macOS arm64; multi-track player, project library, shadcn UI, Windows/Linux builds, and CI are deferred. **See [`docs/phase-1.md`](./docs/phase-1.md) for the full plan, the implementation deltas, and the known quirks. [`docs/roadmap.md`](./docs/roadmap.md) sketches Phase 2~5 (player + design system, library + AppLocalData + cancel, prod packaging, CI/signing).**
 
 ### Architecture (Phase 1)
 
