@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 
 import type { SidecarEvent } from "../model/events";
 import { usePipelineStore } from "../model/store";
@@ -8,28 +8,35 @@ const EVENT_DATA = "yt-split:event";
 const EVENT_LOG = "yt-split:log";
 const EVENT_DONE = "yt-split:done";
 
-let unlisteners: UnlistenFn[] = [];
+// Listener registration must survive both React StrictMode's double-invoked
+// useEffect (dev) and Vite HMR module re-evaluations. A module-level guard is
+// reset on HMR; storing the promise on globalThis keeps it alive for the
+// lifetime of the webview, which is exactly what we want — the sidecar
+// channel is global state, not component state.
+//
+// Refs:
+// - Tauri Discussion #5194 (avoid duplicate listeners)
+// - React Issue #24502 (StrictMode double-invokes useEffect in dev)
+declare global {
+    // eslint-disable-next-line no-var
+    var __ytSplitSidecarAttach: Promise<void> | undefined;
+}
 
-/** Subscribe to sidecar events once on app mount. */
-export async function attachSidecarListeners(): Promise<UnlistenFn> {
+function doAttach(): Promise<void> {
     const store = usePipelineStore.getState();
+    return Promise.all([
+        listen<SidecarEvent>(EVENT_DATA, (e) => store.handleEvent(e.payload)),
+        listen<string>(EVENT_LOG, (e) => store.appendLog(e.payload)),
+        listen<number>(EVENT_DONE, (e) => store.finishWithCode(e.payload)),
+    ]).then(() => undefined);
+}
 
-    const offData = await listen<SidecarEvent>(EVENT_DATA, (e) => {
-        store.handleEvent(e.payload);
-    });
-    const offLog = await listen<string>(EVENT_LOG, (e) => {
-        store.appendLog(e.payload);
-    });
-    const offDone = await listen<number>(EVENT_DONE, (e) => {
-        store.finishWithCode(e.payload);
-    });
-
-    unlisteners = [offData, offLog, offDone];
-
-    return () => {
-        for (const u of unlisteners) u();
-        unlisteners = [];
-    };
+export function attachSidecarListeners(): Promise<void> {
+    if (globalThis.__ytSplitSidecarAttach) {
+        return globalThis.__ytSplitSidecarAttach;
+    }
+    globalThis.__ytSplitSidecarAttach = doAttach();
+    return globalThis.__ytSplitSidecarAttach;
 }
 
 /** Kick off a separation pipeline run. Resolves when the sidecar exits. */

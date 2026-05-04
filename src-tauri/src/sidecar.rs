@@ -82,8 +82,18 @@ pub async fn run_pipeline(app: AppHandle, args: PipelineArgs) -> Result<(), Stri
         cmd_args.push(stem);
     }
 
+    // Pin the sidecar's working directory to the project root so the Python
+    // side writes downloads/ and output/ next to the repo, not under src-tauri/
+    // where Tauri dev happens to spawn us. Phase 1: dev path; production will
+    // switch to AppLocalData via tauri::path::PathResolver.
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
+
     let mut child = Command::new(&bin)
         .args(&cmd_args)
+        .current_dir(&workspace_root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
