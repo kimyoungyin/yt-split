@@ -102,10 +102,17 @@ def test_main_prints_korean_error_and_exits_when_pipeline_fails(monkeypatch, cap
     assert "처리 실패" in captured.err
 
 
-def test_main_sidecar_emits_hardware_event_on_check(monkeypatch, capsys):
-    """--sidecar --check should emit exactly one NDJSON 'hardware' event on stdout."""
+def test_main_sidecar_emits_hardware_event_on_check(monkeypatch):
+    """--sidecar --check should emit exactly one NDJSON 'hardware' event on stdout.
+
+    The sidecar emitter writes to sys.__stdout__ so demucs/yt-dlp redirect
+    blocks can't divert it; we monkeypatch __stdout__ to capture the bytes.
+    """
+    import io
     import sys as _sys
 
+    buf = io.StringIO()
+    monkeypatch.setattr(_sys, "__stdout__", buf)
     monkeypatch.setattr(
         _sys,
         "argv",
@@ -129,7 +136,7 @@ def test_main_sidecar_emits_hardware_event_on_check(monkeypatch, capsys):
 
     main()
 
-    out = capsys.readouterr().out.strip().splitlines()
+    out = buf.getvalue().strip().splitlines()
     assert len(out) == 1
     payload = json.loads(out[0])
     assert payload["type"] == "hardware"
@@ -137,10 +144,13 @@ def test_main_sidecar_emits_hardware_event_on_check(monkeypatch, capsys):
     assert payload["ram_gb"] == 32.0
 
 
-def test_main_sidecar_emits_done_when_url_pipeline_succeeds(monkeypatch, capsys):
+def test_main_sidecar_emits_done_when_url_pipeline_succeeds(monkeypatch):
     """--sidecar --url 성공 경로는 done 이벤트로 끝나야 한다."""
+    import io
     import sys as _sys
 
+    buf = io.StringIO()
+    monkeypatch.setattr(_sys, "__stdout__", buf)
     monkeypatch.setattr(
         _sys,
         "argv",
@@ -167,7 +177,7 @@ def test_main_sidecar_emits_done_when_url_pipeline_succeeds(monkeypatch, capsys)
 
     main()
 
-    lines = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
+    lines = [json.loads(l) for l in buf.getvalue().strip().splitlines()]
     types = [e["type"] for e in lines]
     assert types[0] == "hardware"
     assert types[-1] == "done"

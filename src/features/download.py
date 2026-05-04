@@ -43,9 +43,15 @@ def download_audio(
         'no_warnings': True,
     }
     if emitter is not None and emitter.enabled:
+        # In sidecar mode stdout is the NDJSON channel. yt-dlp keeps writing
+        # human-readable progress bars even with quiet=True, so silence them
+        # via noprogress and route any stray output to stderr.
         ydl_opts['progress_hooks'] = [_make_progress_hook(emitter)]
         ydl_opts['quiet'] = True
         ydl_opts['no_warnings'] = True
+        ydl_opts['noprogress'] = True
+        ydl_opts['logtostderr'] = True
+        ydl_opts['consoletitle'] = False
 
     if emitter is not None and emitter.enabled:
         emitter.emit("stage", stage="download", status="start", url=url)
