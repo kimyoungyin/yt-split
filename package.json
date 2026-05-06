@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "tauri": "ui/node_modules/.bin/tauri",
-    "dev": "ui/node_modules/.bin/tauri dev",
-    "build:app": "ui/node_modules/.bin/tauri build"
+    "tauri": "PATH=\"$HOME/.cargo/bin:$PATH\" ui/node_modules/.bin/tauri",
+    "dev": "PATH=\"$HOME/.cargo/bin:$PATH\" ui/node_modules/.bin/tauri dev",
+    "build:app": "PATH=\"$HOME/.cargo/bin:$PATH\" ui/node_modules/.bin/tauri build"
   }
 }
