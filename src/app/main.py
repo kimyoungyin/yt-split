@@ -1,6 +1,8 @@
 import argparse
+import signal
 import sys
 from pathlib import Path
+from types import FrameType
 from typing import Optional
 
 from src.features.download import download_audio
@@ -11,6 +13,31 @@ from src.features.ffmpeg_env import (
 from src.features.progress import ProgressEmitter
 from src.features.separation import separate_audio
 from src.features.system import check_hardware_compatibility
+
+
+def _install_cancel_handler(emitter: ProgressEmitter) -> None:
+    """SIGTERM from Tauri's cancel_pipeline → emit a final error+done pair so
+    the UI can distinguish 'cancelled' from a generic non-zero exit, then exit.
+
+    Windows lacks SIGTERM as a sendable signal; we still register if the
+    constant exists, since the cancel command on Windows is a Phase 4 follow-up.
+    """
+    sigterm = getattr(signal, "SIGTERM", None)
+    if sigterm is None:
+        return
+
+    def _on_term(signum: int, _frame: Optional[FrameType]) -> None:
+        try:
+            emitter.emit(
+                "error",
+                stage="pipeline",
+                message="사용자가 분리를 취소했습니다.",
+            )
+            emitter.emit("done", ok=False)
+        finally:
+            sys.exit(128 + signum)
+
+    signal.signal(sigterm, _on_term)
 
 
 def run_pipeline(
@@ -46,6 +73,9 @@ def main() -> None:
 
     args = parser.parse_args()
     emitter = ProgressEmitter(enabled=bool(args.sidecar))
+
+    if emitter.enabled:
+        _install_cancel_handler(emitter)
 
     stats = check_hardware_compatibility(check_path=Path.cwd())
 

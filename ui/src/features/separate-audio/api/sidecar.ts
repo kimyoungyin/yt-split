@@ -49,3 +49,8 @@ export async function runPipeline(args: {
         args: { url: args.url, stem: args.stem ?? null },
     });
 }
+
+/** Send SIGTERM to the running sidecar (no-op when nothing is running). */
+export async function cancelPipeline(): Promise<void> {
+    await invoke("cancel_pipeline");
+}

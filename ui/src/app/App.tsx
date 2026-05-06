@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 
-import { attachSidecarListeners } from "../features/separate-audio/api/sidecar";
-import { PipelineRunner } from "../features/separate-audio/ui/PipelineRunner";
+import { useAutoLoadPlayer } from "@/features/audio-player/api/auto-load";
+import { Player } from "@/features/audio-player/ui/Player";
+import { attachSidecarListeners } from "@/features/separate-audio/api/sidecar";
+import { PipelineRunner } from "@/features/separate-audio/ui/PipelineRunner";
 
 export function App() {
     // attachSidecarListeners is idempotent and lives for the lifetime of the
@@ -12,5 +14,14 @@ export function App() {
         void attachSidecarListeners();
     }, []);
 
-    return <PipelineRunner />;
+    useAutoLoadPlayer();
+
+    return (
+        <main className="min-h-screen bg-background text-foreground">
+            <div className="mx-auto max-w-3xl space-y-4 p-6">
+                <PipelineRunner />
+                <Player />
+            </div>
+        </main>
+    );
 }

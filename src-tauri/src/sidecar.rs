@@ -8,9 +8,10 @@
 
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::Mutex;
 
 use serde::Deserialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, State};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
@@ -22,6 +23,19 @@ const EVENT_DONE: &str = "yt-split:done";
 pub struct PipelineArgs {
     pub url: String,
     pub stem: Option<String>,
+}
+
+/// Tracks the OS pid of the running sidecar so `cancel_pipeline` can signal it
+/// without taking the Child's exclusive borrow away from the wait loop.
+#[derive(Default)]
+pub struct PipelineState {
+    pid: Mutex<Option<u32>>,
+}
+
+impl PipelineState {
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 /// Compile-time target triple suffix for the staged sidecar folder name.
@@ -67,7 +81,11 @@ fn sidecar_path() -> PathBuf {
 }
 
 #[tauri::command]
-pub async fn run_pipeline(app: AppHandle, args: PipelineArgs) -> Result<(), String> {
+pub async fn run_pipeline(
+    app: AppHandle,
+    state: State<'_, PipelineState>,
+    args: PipelineArgs,
+) -> Result<(), String> {
     let bin = sidecar_path();
     if !bin.exists() {
         return Err(format!(
@@ -99,6 +117,12 @@ pub async fn run_pipeline(app: AppHandle, args: PipelineArgs) -> Result<(), Stri
         .spawn()
         .map_err(|e| format!("사이드카 spawn 실패: {e}"))?;
 
+    if let Some(pid) = child.id() {
+        if let Ok(mut guard) = state.pid.lock() {
+            *guard = Some(pid);
+        }
+    }
+
     let stdout = child.stdout.take().expect("stdout piped");
     let stderr = child.stderr.take().expect("stderr piped");
 
@@ -127,10 +151,11 @@ pub async fn run_pipeline(app: AppHandle, args: PipelineArgs) -> Result<(), Stri
         }
     });
 
-    let status = child
-        .wait()
-        .await
-        .map_err(|e| format!("사이드카 wait 실패: {e}"))?;
+    let wait_result = child.wait().await;
+    if let Ok(mut guard) = state.pid.lock() {
+        *guard = None;
+    }
+    let status = wait_result.map_err(|e| format!("사이드카 wait 실패: {e}"))?;
     let _ = stdout_task.await;
     let _ = stderr_task.await;
 
@@ -140,5 +165,36 @@ pub async fn run_pipeline(app: AppHandle, args: PipelineArgs) -> Result<(), Stri
         Ok(())
     } else {
         Err(format!("사이드카 종료 코드: {:?}", status.code()))
+    }
+}
+
+#[tauri::command]
+pub async fn cancel_pipeline(state: State<'_, PipelineState>) -> Result<(), String> {
+    let pid = state
+        .pid
+        .lock()
+        .map_err(|e| format!("state lock poisoned: {e}"))?
+        .clone();
+    let Some(pid) = pid else {
+        // No active sidecar; treat as a no-op so the UI can call this freely.
+        return Ok(());
+    };
+
+    #[cfg(unix)]
+    {
+        // SIGTERM lets the Python handler emit a final "cancelled" event before
+        // exiting. SIGKILL would leave the UI without context for the abort.
+        let rc = unsafe { libc::kill(pid as i32, libc::SIGTERM) };
+        if rc != 0 {
+            let err = std::io::Error::last_os_error();
+            return Err(format!("kill({pid}, SIGTERM) failed: {err}"));
+        }
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    {
+        let _ = pid;
+        Err("Windows에서의 사이드카 취소는 Phase 4 패키징 단계에서 추가 예정".into())
     }
 }
