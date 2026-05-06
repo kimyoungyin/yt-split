@@ -1,4 +1,4 @@
-.claude/scheduled_tasks.lock
+.claude/
 .venv/
 __pycache__/
 *.pyc
@@ -16,3 +16,8 @@ src-tauri/target/
 # Frontend
 ui/node_modules/
 ui/dist/
+
+# Root-only node_modules / lockfile (root package.json has no deps; pnpm
+# creates these as a side effect of `pnpm install` in the repo root).
+/node_modules/
+/pnpm-lock.yaml
