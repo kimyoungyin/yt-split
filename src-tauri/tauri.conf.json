@@ -23,7 +23,7 @@
             "csp": null,
             "assetProtocol": {
                 "enable": true,
-                "scope": ["$APPLOCALDATA/**", "**/output/**"]
+                "scope": ["$APPLOCALDATA/yt-split/**"]
             }
         }
     },

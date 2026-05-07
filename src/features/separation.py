@@ -6,6 +6,7 @@ emitter we monkey-patch `demucs.apply.tqdm` with a thin wrapper that yields
 the same items but reports a 0..1 ratio per chunk.
 """
 import contextlib
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Iterable, Iterator, List, Optional
@@ -61,13 +62,13 @@ def _patched_demucs_progress(emitter: Optional[ProgressEmitter]) -> Iterator[Non
 
 def _build_demucs_args(
     input_file: Path,
-    output_dir: Path,
+    project_dir: Path,
     stems: Optional[str],
     device: str,
 ) -> List[str]:
     args = [
         "-n", "htdemucs",
-        "-o", str(output_dir),
+        "-o", str(project_dir),
         "-d", device,
     ]
     if stems:
@@ -76,36 +77,32 @@ def _build_demucs_args(
     return args
 
 
-def _resolve_output_tracks(
-    output_dir: Path,
-    input_file: Path,
-    stems: Optional[str],
-) -> dict[str, str]:
-    """Map demucs output filenames to a {stem_name: absolute_path} dict.
-
-    demucs writes to `<output_dir>/htdemucs/<track_stem>/<stem>.wav`.
-    """
+def _move_to_stems(project_dir: Path, input_file: Path) -> dict[str, Path]:
+    """Move demucs output from htdemucs/<title>/ to stems/ and return absolute paths."""
     track_stem = input_file.stem
-    track_dir = output_dir / "htdemucs" / track_stem
-    if not track_dir.is_dir():
-        return {}
-    return {
-        wav.stem: str(wav.resolve())
-        for wav in track_dir.glob("*.wav")
-    }
+    src_dir = project_dir / "htdemucs" / track_stem
+    stems_dir = project_dir / "stems"
+    stems_dir.mkdir(exist_ok=True)
+    result: dict[str, Path] = {}
+    for wav in src_dir.glob("*.wav"):
+        dest = stems_dir / wav.name
+        shutil.move(str(wav), str(dest))
+        result[wav.stem] = dest.resolve()
+    return result
 
 
 def separate_audio(
     input_file: Path,
-    output_dir: Path,
+    project_dir: Path,
     stems: Optional[str] = None,
     device: str = "cpu",
     emitter: Optional[ProgressEmitter] = None,
-) -> bool:
-    """Separates audio into stems using Meta's Demucs.
+) -> Optional[dict[str, Path]]:
+    """Separate audio into stems using Meta's Demucs.
 
-    `device` is forwarded to demucs as `-d` (cpu, cuda, mps).
-    `emitter` reports progress events; pass None to silence (CLI mode).
+    Returns a dict of {stem_name: absolute_path} on success, None on failure.
+    stage.done event is intentionally NOT emitted here; the caller (run_pipeline)
+    emits it with the full project context (project_id, title, tracks).
     """
     if not input_file.exists():
         msg = f"오류: 입력 파일이 없습니다: {input_file}"
@@ -113,7 +110,7 @@ def separate_audio(
             emitter.emit("error", stage="separate", message=msg)
         else:
             print(msg)
-        return False
+        return None
 
     if emitter is not None and emitter.enabled:
         emitter.emit("stage", stage="separate", status="start", model="htdemucs", device=device)
@@ -121,36 +118,29 @@ def separate_audio(
         print(f"분리 시작: {input_file.name}")
         print("하드웨어에 따라 시간이 오래 걸릴 수 있습니다...")
 
-    opts = _build_demucs_args(input_file, output_dir, stems, device)
+    opts = _build_demucs_args(input_file, project_dir, stems, device)
 
     try:
         from demucs.separate import main as demucs_main
 
-        # Demucs prints status lines to stdout. In sidecar mode stdout is the
-        # NDJSON channel, so redirect demucs prints to stderr.
         redirect_target = sys.stderr if (emitter is not None and emitter.enabled) else sys.stdout
         with _patched_demucs_progress(emitter), contextlib.redirect_stdout(redirect_target):
             demucs_main(opts)
 
-        tracks = _resolve_output_tracks(output_dir, input_file, stems)
-        if emitter is not None and emitter.enabled:
-            emitter.emit("stage", stage="separate", status="done", tracks=tracks)
-        else:
-            print(f"분리가 완료되었습니다. 결과 경로: {output_dir}")
-        return True
+        tracks = _move_to_stems(project_dir, input_file)
+        return tracks
 
     except SystemExit as exc:
-        # demucs.separate uses dora.log.fatal which calls sys.exit on errors.
         msg = f"Demucs 종료 코드: {exc.code}"
         if emitter is not None and emitter.enabled:
             emitter.emit("error", stage="separate", message=msg)
         else:
             print(f"오류: Demucs 프로세스가 실패했습니다. ({msg})")
-        return False
+        return None
     except Exception as e:
         msg = f"분리 중 예기치 않은 오류: {str(e)}"
         if emitter is not None and emitter.enabled:
             emitter.emit("error", stage="separate", message=msg)
         else:
             print(msg)
-        return False
+        return None

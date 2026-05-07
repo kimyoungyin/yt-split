@@ -11,7 +11,7 @@ use std::process::Stdio;
 use std::sync::Mutex;
 
 use serde::Deserialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
@@ -94,24 +94,35 @@ pub async fn run_pipeline(
         ));
     }
 
-    let mut cmd_args: Vec<String> = vec!["--url".into(), args.url, "--sidecar".into()];
+    // Busy check: reject if a pipeline is already running.
+    {
+        let guard = state.pid.lock().map_err(|e| format!("state lock poisoned: {e}"))?;
+        if guard.is_some() {
+            return Err("이미 파이프라인이 실행 중입니다.".into());
+        }
+    }
+
+    // Resolve AppLocalData base directory and pass it to the sidecar via --workdir.
+    let base_dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| format!("AppLocalData 경로 조회 실패: {e}"))?
+        .join("yt-split");
+    std::fs::create_dir_all(&base_dir)
+        .map_err(|e| format!("workdir 생성 실패: {e}"))?;
+
+    let mut cmd_args: Vec<String> = vec![
+        "--url".into(), args.url,
+        "--sidecar".into(),
+        "--workdir".into(), base_dir.to_string_lossy().into_owned(),
+    ];
     if let Some(stem) = args.stem {
         cmd_args.push("--stem".into());
         cmd_args.push(stem);
     }
 
-    // Pin the sidecar's working directory to the project root so the Python
-    // side writes downloads/ and output/ next to the repo, not under src-tauri/
-    // where Tauri dev happens to spawn us. Phase 1: dev path; production will
-    // switch to AppLocalData via tauri::path::PathResolver.
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| PathBuf::from("."));
-
     let mut child = Command::new(&bin)
         .args(&cmd_args)
-        .current_dir(&workspace_root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()

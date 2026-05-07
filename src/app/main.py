@@ -1,6 +1,7 @@
 import argparse
 import signal
 import sys
+import uuid as _uuid
 from pathlib import Path
 from types import FrameType
 from typing import Optional
@@ -11,6 +12,7 @@ from src.features.ffmpeg_env import (
     ensure_shared_ffmpeg_for_torchcodec,
 )
 from src.features.progress import ProgressEmitter
+from src.features.project import create_project_metadata
 from src.features.separation import separate_audio
 from src.features.system import check_hardware_compatibility
 
@@ -47,17 +49,42 @@ def run_pipeline(
     base_dir: Path,
     emitter: Optional[ProgressEmitter] = None,
 ) -> bool:
-    """Download audio from URL then run stem separation. Returns True on success."""
+    """Download audio from URL, run stem separation, write project metadata."""
     downloads_dir = base_dir / "downloads"
-    output_dir = base_dir / "output"
     downloads_dir.mkdir(parents=True, exist_ok=True)
-    output_dir.mkdir(parents=True, exist_ok=True)
 
-    downloaded = download_audio(url, downloads_dir, emitter=emitter)
+    downloaded, title = download_audio(url, downloads_dir, emitter=emitter)
     if downloaded is None:
         return False
 
-    return separate_audio(downloaded, output_dir, stem, device, emitter=emitter)
+    project_id = str(_uuid.uuid4())
+    project_dir = base_dir / "projects" / project_id
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    tracks = separate_audio(downloaded, project_dir, stem, device, emitter=emitter)
+    if tracks is None:
+        return False
+
+    create_project_metadata(
+        base=base_dir,
+        project_id=project_id,
+        title=title,
+        url=url,
+        device=device,
+        stem_mode=stem or "all",
+        tracks=tracks,
+    )
+
+    if emitter is not None and emitter.enabled:
+        emitter.emit(
+            "stage", stage="separate", status="done",
+            project_id=project_id, title=title,
+            tracks={k: str(v) for k, v in tracks.items()},
+        )
+    else:
+        print(f"분리 완료: {project_dir}")
+
+    return True
 
 
 def main() -> None:
@@ -70,14 +97,20 @@ def main() -> None:
         action="store_true",
         help="Emit NDJSON events on stdout for the Tauri host (no human-readable prints).",
     )
+    parser.add_argument(
+        "--workdir",
+        type=str,
+        help="Base directory for downloads and projects (default: cwd).",
+    )
 
     args = parser.parse_args()
+    base_dir = Path(args.workdir) if args.workdir else Path.cwd()
     emitter = ProgressEmitter(enabled=bool(args.sidecar))
 
     if emitter.enabled:
         _install_cancel_handler(emitter)
 
-    stats = check_hardware_compatibility(check_path=Path.cwd())
+    stats = check_hardware_compatibility(check_path=base_dir)
 
     if emitter.enabled:
         emitter.emit(
@@ -124,7 +157,7 @@ def main() -> None:
             url=args.url,
             stem=args.stem,
             device=stats["demucs_device"],
-            base_dir=Path.cwd(),
+            base_dir=base_dir,
             emitter=emitter,
         )
         if not ok:

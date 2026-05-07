@@ -27,7 +27,7 @@ def download_audio(
     url: str,
     output_path: Path,
     emitter: Optional[ProgressEmitter] = None,
-) -> Optional[Path]:
+) -> tuple[Optional[Path], str]:
     """
     Extracts audio from a YouTube URL using yt-dlp.
     """
@@ -67,7 +67,8 @@ def download_audio(
                     emitter.emit("error", stage="download", message=msg)
                 else:
                     print(msg)
-                return None
+                return None, ""
+            title: str = info.get("title", "") or ""
             source_path = Path(ydl.prepare_filename(info))
             downloaded_file = source_path.with_suffix(".mp3")
 
@@ -76,8 +77,8 @@ def download_audio(
                     emitter.emit("stage", stage="download", status="done", path=str(downloaded_file.resolve()))
                 else:
                     print(f"다운로드 완료: {downloaded_file}")
-                return downloaded_file
-            return None
+                return downloaded_file, title
+            return None, title
 
     except Exception as e:
         msg = f"다운로드 오류: {str(e)}"
@@ -85,4 +86,4 @@ def download_audio(
             emitter.emit("error", stage="download", message=msg)
         else:
             print(msg)
-        return None
+        return None, ""
