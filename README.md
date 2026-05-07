@@ -77,6 +77,29 @@ python -m src.app.main --url "https://www.youtube.com/watch?v=VIDEO_ID"
 | `--url URL` | 처리할 YouTube URL                       |
 | `--stem`    | 선택: `vocals`, `drums`, `bass`, `other` |
 
+### 데스크탑 앱 (Tauri)
+
+`pnpm dev` 또는 빌드된 `.app`으로 실행합니다. CLI와 달리 **모든 결과물은 OS 앱 데이터 디렉터리**에 저장됩니다.
+
+| OS | 경로 |
+| --- | --- |
+| macOS | `~/Library/Application Support/com.ytsplit.app/yt-split/` |
+| Windows | `%APPDATA%\com.ytsplit.app\yt-split\` |
+| Linux | `~/.local/share/com.ytsplit.app/yt-split/` |
+
+하위 구조:
+
+```
+yt-split/
+├── downloads/          # yt-dlp 원본 mp3
+└── projects/
+    ├── <uuid>.json     # 프로젝트 메타데이터 (제목·URL·기기·스템 모드)
+    └── <uuid>/
+        └── stems/      # 분리된 wav 파일
+```
+
+**Phase 1·2 빌드에서 업그레이드하는 경우:** 이전 결과는 저장소 루트의 `./output/`에 남아있으며 라이브러리에 자동으로 나타나지 않습니다. 수동으로 옮기거나 URL을 다시 처리하세요.
+
 ### 테스트
 
 ```bash
@@ -162,6 +185,29 @@ This repository documents **installing from a Git clone** (venv + `requirements.
 | `--check`   | Print CUDA, RAM, and warnings; no download      |
 | `--url URL` | YouTube URL to process                          |
 | `--stem`    | Optional: `vocals`, `drums`, `bass`, or `other` |
+
+### Desktop app (Tauri)
+
+Run via `pnpm dev` or the built `.app`. Unlike the CLI, **all outputs are stored in the OS app-data directory**, not the current working directory.
+
+| OS | Path |
+| --- | --- |
+| macOS | `~/Library/Application Support/com.ytsplit.app/yt-split/` |
+| Windows | `%APPDATA%\com.ytsplit.app\yt-split\` |
+| Linux | `~/.local/share/com.ytsplit.app/yt-split/` |
+
+Directory layout:
+
+```
+yt-split/
+├── downloads/          # raw yt-dlp mp3
+└── projects/
+    ├── <uuid>.json     # project metadata (title, URL, device, stem mode)
+    └── <uuid>/
+        └── stems/      # separated wav files
+```
+
+**Upgrading from a Phase 1 or Phase 2 build:** previous results remain in `./output/` under the repository root and will not appear in the Library automatically. Move them manually or reprocess the URLs.
 
 ### Tests
 
