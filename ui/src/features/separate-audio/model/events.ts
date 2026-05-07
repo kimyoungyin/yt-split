@@ -33,6 +33,8 @@ export interface StageDoneEvent {
     stage: Stage;
     path?: string;
     tracks?: Record<string, string>;
+    project_id?: string;
+    title?: string;
 }
 
 export interface ProgressEvent {
