@@ -1,216 +1,359 @@
 # yt-split
 
-YouTube URL에서 **yt-dlp**로 오디오를 내려받고, **Demucs**(`htdemucs`)로 스템을 분리하는 로컬 파이프라인입니다. 프로젝트 규칙·하드웨어 점검은 [CLAUDE.md](./CLAUDE.md)를 참고하세요.  
-English: [below](#english).
+YouTube URL 하나로 **보컬 · 드럼 · 베이스 · 기타** 4개 트랙을 분리하는 데스크탑 앱.  
+Meta의 [Demucs](https://github.com/facebookresearch/demucs) AI 모델(`htdemucs`)을 로컬에서 실행합니다.
+
+English: [below](#english)
+
+---
 
 ## 한국어
 
-### 요약: 필요한 것
+### 특징
 
-- **Python 3.10+** (Windows는 venv를 만들기 전에 `python` / `py`가 `PATH`에 있는지 확인. [python.org](https://www.python.org/) 등에서 설치.)
-- **Python 패키지**: `pip install -r requirements.txt` (아래 **처음 설치 (Git 클론)** 절차 참고).
-- **FFmpeg**
-    - **static-ffmpeg**(`requirements.txt`에 포함): 시스템에 `ffmpeg`가 없을 때 `PATH`에 `ffmpeg` / `ffprobe`를 쓸 수 있게 합니다. **첫 `--url` 실행** 시 바이너리를 **내려받을 수 있으며**(네트워크 필요) 이미 `PATH`에 `ffmpeg`가 있으면 그쪽을 씁니다.
-    - **스템 저장(Demucs)**: PyTorch / `torchaudio`가 **torchcodec**을 쓰므로, FFmpeg **공유 라이브러리**(예: `libavutil`)가 필요합니다. static 번들로는 **대체할 수 없습니다**. **첫** `python -m src.app.main --url ...` **이전에** 아래 OS별로 시스템 FFmpeg를 설치하세요.
-- **첫 전체 실행**: Demucs가 **모델 가중치**를 내려받을 수 있으며(대략 **~2GB** 수준, PyTorch 캐시), **디스크 여유**가 있어야 합니다(앱이 현재 작업 디렉터리 기준으로도 일정 이상의 여유를 요구합니다. [CLAUDE.md](./CLAUDE.md)). 첫 `--url`은 시간이 걸릴 수 있으니 **네트워크**를 안정적으로 두세요.
+- YouTube URL → 4-stem WAV 분리 (보컬 / 드럼 / 베이스 / 기타)
+- 분리된 트랙 멀티트랙 플레이어 (트랙별 볼륨 · 소거 · 솔로)
+- 프로젝트 라이브러리 (처리 이력 누적, 언제든 다시 열기)
+- 모든 처리가 **내 컴퓨터에서만** 실행됨 — 서버 없음, 클라우드 없음
 
-### 처음 설치 (Git 클론)
+---
 
-터미널에서 **아래 순서**대로 진행하세요.
+### 패치노트
 
-#### 1. 저장소 클론
+#### v0.1.0 — 2026-05-09
 
+- YouTube → 4-stem 분리 파이프라인 (yt-dlp + htdemucs)
+- 멀티트랙 플레이어 (Web Audio API 기반 샘플 정확 동기)
+- 프로젝트 라이브러리 + AppLocalData 저장
+- macOS Apple Silicon(arm64) / Intel(x86_64), Windows x86_64, Linux x86_64 패키지
+
+---
+
+### 다운로드
+
+[GitHub Releases](../../releases/latest) 페이지에서 OS에 맞는 파일을 받으세요.
+
+| OS | 파일 |
+|----|------|
+| macOS Apple Silicon | `yt-split_*_aarch64.dmg` |
+| macOS Intel | `yt-split_*_x64.dmg` |
+| Windows | `yt-split_*_x64-setup.exe` |
+| Linux | `yt-split_*_amd64.AppImage` |
+
+---
+
+### 사용 가이드
+
+#### 설치
+
+**macOS**  
+`.dmg`를 열고 앱을 응용 프로그램 폴더로 드래그하세요.  
+> 코드 서명 없이 배포된 경우 Gatekeeper가 "개발자를 확인할 수 없습니다" 경고를 표시합니다.  
+> 이 경우: Finder에서 앱을 **우클릭 → 열기**를 선택하고 팝업에서 다시 "열기"를 클릭하세요. 이후엔 정상적으로 실행됩니다.
+
+**Windows**  
+`.exe` 설치 프로그램을 실행하세요. SmartScreen 경고가 뜨면 "추가 정보 → 실행"을 클릭하세요.
+
+**Linux**  
+`.AppImage` 파일에 실행 권한을 부여한 후 실행하세요.
 ```bash
-git clone <REPO_URL> yt-split
-cd yt-split
+chmod +x yt-split_*.AppImage
+./yt-split_*.AppImage
 ```
 
-`<REPO_URL>`은 GitHub의 이 프로젝트 HTTPS 또는 SSH URL로 바꿉니다.
+#### 첫 실행 — 모델 다운로드
 
-#### 2. 시스템 FFmpeg(공유 라이브러리) 설치 — **첫 `--url` 이전에**
+첫 번째 분리 시 Demucs 모델 가중치를 자동으로 내려받습니다.
 
-`pip install`과 **별도**이며, **torchcodec**용입니다.
+- **용량:** 약 2GB
+- **저장 위치:** `~/.cache/torch/hub/` (운영체제 기본 캐시)
+- **소요 시간:** 인터넷 속도에 따라 5~20분
+- 이후 실행부터는 즉시 시작합니다.
 
-| OS                           | 명령 / 비고                                                                                                                                                                                                   |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **macOS** (Homebrew)         | `brew install ffmpeg` — 라이브러리 경로 예: Apple Silicon `/opt/homebrew/opt/ffmpeg/lib`, Intel Homebrew `/usr/local/opt/ffmpeg/lib`. 해당 `lib`가 있으면 CLI가 `DYLD_LIBRARY_PATH` 앞에 붙입니다.            |
-| **Linux** (Debian/Ubuntu 등) | 예: `sudo apt update && sudo apt install -y ffmpeg` — `libavutil`이 일반적인 경로(예: `/usr/lib/x86_64-linux-gnu`)에 있어야 합니다.                                                                           |
-| **Windows**                  | **공유 DLL**이 포함된 FFmpeg 빌드를 쓰고, [torchcodec Windows 안내](https://github.com/pytorch/torchcodec#installing-torchcodec)에 맞게 설정하세요. 이 앱이 해당 DLL용 `PATH`를 자동으로 잡아주지는 않습니다. |
+안정적인 인터넷 연결 상태에서 첫 실행을 권장합니다.
 
-#### 3. 가상환경 생성 및 Python 의존성 설치
+#### 분리하기
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate   # Windows (cmd): .venv\Scripts\activate.bat
-                             # Windows (PowerShell): .venv\Scripts\Activate.ps1
-pip install --upgrade pip
-pip install -r requirements.txt
-```
+1. 앱 상단 URL 입력창에 YouTube URL을 붙여넣습니다.
+2. **분리 시작** 버튼을 클릭합니다.
+3. 진행 상황이 단계별로 표시됩니다.
+   - 오디오 다운로드 → AI 분리 → 완료
+4. 완료 후 멀티트랙 플레이어가 열립니다.
 
-CLI는 **저장소 루트**(`yt-split/`)에서 실행해 `import src`가 동작하도록 하세요.
+#### 플레이어
 
-#### 4. 하드웨어 확인 후 전체 파이프라인 실행
+| 기능 | 설명 |
+|------|------|
+| 볼륨 슬라이더 | 트랙별 음량 조절 |
+| 소거(Mute) | 해당 트랙 음소거 |
+| 솔로(Solo) | 해당 트랙만 재생 |
 
-```bash
-python -m src.app.main --check
-python -m src.app.main --url "https://www.youtube.com/watch?v=VIDEO_ID"
-```
+#### 라이브러리
 
-선택: 스템 하나만 — `python -m src.app.main --url "https://..." --stem vocals` (`drums` / `bass` / `other` 동일).
+이전에 처리한 모든 프로젝트가 왼쪽 라이브러리 패널에 쌓입니다. 항목을 클릭하면 즉시 플레이어로 열립니다.
 
-**출력**은 **명령을 실행한 현재 작업 디렉터리** 기준 `./downloads`, `./output`에 생깁니다(`src/` 안이 아님).
-
-#### `--check`와 `--url`의 차이
-
-- **`--check`**: CUDA, MPS, RAM, Demucs 장치, 경고를 출력합니다. 실제 `--url`과 **동일한** FFmpeg / torchcodec 준비를 돌리지 **않고**, 오디오를 받지도 **않습니다**. `--check`는 통과했는데 `--url`에서 FFmpeg·코덱 오류가 나면 **2번 단계**와 [torchcodec 설치](https://github.com/pytorch/torchcodec#installing-torchcodec)를 다시 확인하세요.
-- **`--url`**: 번들 경로의 FFmpeg(필요 시 `static-ffmpeg`)와 torchcodec용 공유 lib 경로를 적용한 뒤, 다운로드·분리를 수행합니다. 의존성을 갖춘 **끝에서 끝** 검증은 이걸 쓰세요.
-
-### 설치 앱 / 배포용 바이너리로 받는 경우
-
-이 저장소는 **Git 클론 + venv + `requirements.txt` + 위의 시스템 FFmpeg** 기준으로 설명합니다. **독립 앱**(설치 프로그램, zip, 포터블 등)을 배포하는 경우, **Python 런타임·venv(또는 내장 deps)·FFmpeg+공유 라·모델 캐시** 위치는 직접 문서화하거나 스크립트로 묶어야 하며, **이 저장소에서 자동화하지 않습니다**.
-
-### CLI 옵션
-
-| 플래그      | 설명                                     |
-| ----------- | ---------------------------------------- |
-| `--check`   | CUDA, RAM, 경고 등 출력(다운로드 없음)   |
-| `--url URL` | 처리할 YouTube URL                       |
-| `--stem`    | 선택: `vocals`, `drums`, `bass`, `other` |
-
-### 데스크탑 앱 (Tauri)
-
-`pnpm dev` 또는 빌드된 `.app`으로 실행합니다. CLI와 달리 **모든 결과물은 OS 앱 데이터 디렉터리**에 저장됩니다.
+#### 결과물 저장 위치
 
 | OS | 경로 |
-| --- | --- |
+|----|------|
 | macOS | `~/Library/Application Support/com.ytsplit.app/yt-split/` |
 | Windows | `%APPDATA%\com.ytsplit.app\yt-split\` |
 | Linux | `~/.local/share/com.ytsplit.app/yt-split/` |
 
 하위 구조:
-
 ```
 yt-split/
-├── downloads/          # yt-dlp 원본 mp3
+├── downloads/        # yt-dlp 원본 mp3
 └── projects/
-    ├── <uuid>.json     # 프로젝트 메타데이터 (제목·URL·기기·스템 모드)
+    ├── <uuid>.json   # 프로젝트 메타 (제목·URL·날짜·스템 모드)
     └── <uuid>/
-        └── stems/      # 분리된 wav 파일
+        └── stems/
+            ├── vocals.wav
+            ├── drums.wav
+            ├── bass.wav
+            └── other.wav
 ```
 
-**Phase 1·2 빌드에서 업그레이드하는 경우:** 이전 결과는 저장소 루트의 `./output/`에 남아있으며 라이브러리에 자동으로 나타나지 않습니다. 수동으로 옮기거나 URL을 다시 처리하세요.
+---
 
-### 테스트
+### 자주 묻는 질문
 
-```bash
-pytest
-```
+**Q. 인터넷 연결이 계속 필요한가요?**  
+모델 가중치를 처음 내려받을 때만 필요합니다. 이후 분리 작업은 완전히 오프라인으로 실행됩니다. YouTube URL 다운로드는 당연히 인터넷이 필요합니다.
+
+**Q. 처리 시간이 얼마나 걸리나요?**  
+4분짜리 곡 기준으로 Apple Silicon Mac에서 약 1~3분, CPU만 있는 환경에서 5~15분입니다. NVIDIA GPU가 있으면 1분 이내입니다.
+
+**Q. 지원되지 않는 YouTube URL이 있나요?**  
+저작권 보호로 다운로드가 막힌 영상, 연령 제한 영상, 비공개 영상은 처리할 수 없습니다.
 
 ---
 
 ## English
 
-[↑ Korean](#한국어)
+### What it does
 
-Local pipeline: download audio from a YouTube URL with **yt-dlp**, separate stems with **Demucs** (`htdemucs`). See [CLAUDE.md](./CLAUDE.md) for project rules and hardware checks.
+yt-split is a desktop app that downloads audio from a YouTube URL and separates it into four stems — **Vocals · Drums · Bass · Other** — using Meta's [Demucs](https://github.com/facebookresearch/demucs) AI model (`htdemucs`). Everything runs locally on your machine.
 
-### Requirements (summary)
+---
 
-- **Python 3.10+** (install from [python.org](https://www.python.org/) or your OS package manager; on Windows, ensure `python` / `py` is on your `PATH` before creating a venv).
-- **Python dependencies**: `pip install -r requirements.txt` (see **First-time setup (Git clone)** below in this section).
-- **FFmpeg**:
-    - **static-ffmpeg** (from `requirements.txt`) can supply `ffmpeg` / `ffprobe` on your `PATH` when missing. The first `--url` run may **download** those binaries (**network** required). If `ffmpeg` is already on your `PATH`, that copy is used instead.
-    - **Stem writing (Demucs)**: PyTorch / `torchaudio` uses **torchcodec**, which needs FFmpeg **with shared libraries** (e.g. `libavutil`). The static bundle **does not** replace those shared libs. Install system FFmpeg as below **before the first** `python -m src.app.main --url ...`.
-- **First full run**: Demucs may **download model weights** (on the order of **~2GB** into PyTorch’s cache) and needs **enough free disk** (the app also expects sufficient space under the current working directory; see [CLAUDE.md](./CLAUDE.md)). Allow time and a stable network on first `--url`.
+### Changelog
 
-### First-time setup (Git clone)
+#### v0.1.0 — 2026-05-09
 
-Do these **in order** from a terminal.
+- YouTube → 4-stem separation pipeline (yt-dlp + htdemucs)
+- Multi-track player (sample-accurate sync via Web Audio API, per-track volume / mute / solo)
+- Project library + persistent AppLocalData storage
+- Packages for macOS Apple Silicon & Intel, Windows x86_64, Linux x86_64
 
-#### 1. Clone the repository
+---
 
+### Download
+
+Get the installer for your OS from the [Releases](../../releases/latest) page.
+
+| OS | File |
+|----|------|
+| macOS Apple Silicon | `yt-split_*_aarch64.dmg` |
+| macOS Intel | `yt-split_*_x64.dmg` |
+| Windows | `yt-split_*_x64-setup.exe` |
+| Linux | `yt-split_*_amd64.AppImage` |
+
+---
+
+### Usage guide
+
+#### Installation
+
+**macOS**  
+Open the `.dmg` and drag the app to Applications.  
+> If the app is unsigned, Gatekeeper will say "developer cannot be verified."  
+> To open anyway: **right-click the app → Open** in Finder, then click "Open" in the dialog. The app will open normally after that.
+
+**Windows**  
+Run the `.exe` installer. If SmartScreen warns you, click "More info → Run anyway."
+
+**Linux**  
+Make the AppImage executable, then run it.
 ```bash
-git clone <REPO_URL> yt-split
-cd yt-split
+chmod +x yt-split_*.AppImage
+./yt-split_*.AppImage
 ```
 
-Use the HTTPS or SSH URL of this project on GitHub (replace `<REPO_URL>`).
+#### First launch — model download
 
-#### 2. Install system FFmpeg (shared libraries) — before the first `--url`
+On the first separation, the app downloads Demucs model weights automatically.
 
-Pick your OS. This is **in addition to** `pip install`; it satisfies **torchcodec**, not `pip` alone.
+- **Size:** ~2 GB
+- **Location:** `~/.cache/torch/hub/` (OS default cache)
+- **Time:** 5–20 minutes depending on your connection
+- Subsequent runs start immediately.
 
-| OS                              | Command / notes                                                                                                                                                                                                                                             |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **macOS** (Homebrew)            | `brew install ffmpeg` — typical library paths: Apple Silicon `/opt/homebrew/opt/ffmpeg/lib`, Intel Homebrew `/usr/local/opt/ffmpeg/lib`. The CLI prepends that `lib` directory to `DYLD_LIBRARY_PATH` when it exists.                                       |
-| **Linux** (Debian/Ubuntu, etc.) | e.g. `sudo apt update && sudo apt install -y ffmpeg` so `libavutil` is available under usual paths (e.g. `/usr/lib/x86_64-linux-gnu`).                                                                                                                      |
-| **Windows**                     | Use an FFmpeg build that includes **shared DLLs** and matches [torchcodec’s Windows guidance](https://github.com/pytorch/torchcodec#installing-torchcodec). The app does not auto-configure `PATH` for those DLLs; you set it as torchcodec’s docs require. |
+Run the first separation on a stable internet connection.
 
-#### 3. Create a virtual environment and install Python dependencies
+#### Separating a track
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate   # Windows (cmd): .venv\Scripts\activate.bat
-                             # Windows (PowerShell): .venv\Scripts\Activate.ps1
-pip install --upgrade pip
-pip install -r requirements.txt
-```
+1. Paste a YouTube URL into the input field at the top.
+2. Click **Start**.
+3. Watch the progress: download → AI separation → done.
+4. The multi-track player opens automatically when finished.
 
-Run all CLI commands from the **repository root** (`yt-split/`) so `import src` works.
+#### Player controls
 
-#### 4. Check hardware, then run the full pipeline
+| Control | Description |
+|---------|-------------|
+| Volume slider | Adjust per-track level |
+| Mute | Silence that track |
+| Solo | Play only that track |
 
-```bash
-python -m src.app.main --check
-python -m src.app.main --url "https://www.youtube.com/watch?v=VIDEO_ID"
-```
+#### Library
 
-Optional: limit to one stem pair — `python -m src.app.main --url "https://..." --stem vocals` (or `drums` / `bass` / `other`).
+Every processed project appears in the left Library panel. Click any entry to reopen it instantly in the player.
 
-**Outputs** go under `./downloads` and `./output` relative to the **current working directory** (where you run the command), not inside `src/`.
-
-#### About `--check` vs `--url`
-
-- **`--check`**: Prints CUDA, MPS, RAM, Demucs device, and warnings. It does **not** run the same FFmpeg / torchcodec setup as a real `--url` run, and it does **not** download audio. If `--check` looks fine but `--url` fails with FFmpeg or codec-related errors, confirm **step 2** and the [torchcodec install notes](https://github.com/pytorch/torchcodec#installing-torchcodec).
-- **`--url`**: Applies bundled-path FFmpeg (`static-ffmpeg` when needed) and shared-lib paths for torchcodec, then downloads and separates. Use this for a true end-to-end test after dependencies are in place.
-
-### Packaged or downloaded “app” installs
-
-This repository documents **installing from a Git clone** (venv + `requirements.txt` + system FFmpeg as above). If you ship a **standalone app** (installer, zip, or portable bundle), you must document (or script) your own **Python runtime**, **venv or embedded deps**, **FFmpeg + shared libraries**, and **model cache** layout — that flow is **not** automated in this repo.
-
-### CLI reference
-
-| Flag        | Description                                     |
-| ----------- | ----------------------------------------------- |
-| `--check`   | Print CUDA, RAM, and warnings; no download      |
-| `--url URL` | YouTube URL to process                          |
-| `--stem`    | Optional: `vocals`, `drums`, `bass`, or `other` |
-
-### Desktop app (Tauri)
-
-Run via `pnpm dev` or the built `.app`. Unlike the CLI, **all outputs are stored in the OS app-data directory**, not the current working directory.
+#### Where files are saved
 
 | OS | Path |
-| --- | --- |
+|----|------|
 | macOS | `~/Library/Application Support/com.ytsplit.app/yt-split/` |
 | Windows | `%APPDATA%\com.ytsplit.app\yt-split\` |
 | Linux | `~/.local/share/com.ytsplit.app/yt-split/` |
 
-Directory layout:
-
 ```
 yt-split/
-├── downloads/          # raw yt-dlp mp3
+├── downloads/        # raw yt-dlp mp3
 └── projects/
-    ├── <uuid>.json     # project metadata (title, URL, device, stem mode)
+    ├── <uuid>.json   # metadata (title, URL, date, stem mode)
     └── <uuid>/
-        └── stems/      # separated wav files
+        └── stems/
+            ├── vocals.wav
+            ├── drums.wav
+            ├── bass.wav
+            └── other.wav
 ```
 
-**Upgrading from a Phase 1 or Phase 2 build:** previous results remain in `./output/` under the repository root and will not appear in the Library automatically. Move them manually or reprocess the URLs.
+---
 
-### Tests
+### FAQ
+
+**Q. Do I need an internet connection to separate tracks?**  
+Only for the initial model download and to fetch the YouTube audio. The AI separation itself runs entirely offline after that.
+
+**Q. How long does separation take?**  
+A 4-minute song takes roughly 1–3 minutes on Apple Silicon, 5–15 minutes on CPU-only machines, and under 1 minute with an NVIDIA GPU.
+
+**Q. Some YouTube URLs don't work — why?**  
+Copyright-blocked videos, age-restricted videos, and private videos cannot be downloaded by yt-dlp.
+
+---
+
+## 개발자 가이드 / Developer Guide
+
+### 아키텍처 / Architecture
+
+```
+UI (Vite + React + Zustand)  ─── Tauri IPC ───  Rust (Tauri v2, tokio)
+                                                        │
+                                              tokio::process::Command
+                                                        │
+                                          Python sidecar (PyInstaller bundle)
+                                          yt-split-py-<triple>/yt-split-py
+                                                        │
+                                              NDJSON events → stdout
+                                              stderr → log channel
+```
+
+**이벤트 프로토콜 / Event protocol (NDJSON, one line per event):**
+
+```jsonc
+{"type":"hardware", ...}                        // 시작 시 1회
+{"type":"stage", "status":"start"|"done", ...}  // 단계 시작/완료
+{"type":"progress","stage":..., "value":0..1}   // 진행률
+{"type":"error", "stage":..., "message":...}    // 오류
+{"type":"done", "ok":true|false}                // 최종
+```
+
+### 기술 스택 / Tech stack
+
+| 레이어 | 기술 |
+|--------|------|
+| UI | React 18, Vite, Zustand, shadcn/ui, Tailwind CSS |
+| 데스크탑 shell | Tauri v2 (Rust, tokio) |
+| AI 파이프라인 | Python 3.11, Demucs (htdemucs), yt-dlp, torchcodec |
+| 패키징 | PyInstaller (onedir), Tauri bundler |
+| CI | GitHub Actions (macos-14, macos-13, ubuntu-22.04, windows-latest) |
+
+### 로컬 개발 환경 / Local development
+
+**필요 사항 / Prerequisites**
+
+- Python 3.10+
+- Rust (stable)
+- Node 20 + pnpm 9
+- FFmpeg (시스템 설치 / system install)
+  - macOS: `brew install ffmpeg`
+  - Linux: `sudo apt install ffmpeg`
+  - Windows: `choco install ffmpeg`
+
+**설정 및 실행 / Setup and run**
 
 ```bash
+# 1. Python 의존성 + PyInstaller 사이드카 빌드 (5~10분)
+pip install -r requirements.txt
+bash pyinstaller/build.sh          # Windows: pwsh pyinstaller/build.ps1
+
+# 2. UI 의존성
+pnpm --dir ui install
+
+# 3. 개발 서버 (Vite + cargo run + Tauri 윈도우)
+pnpm dev
+
+# 4. 프로덕션 앱 빌드
+pnpm build:app
+```
+
+> `pnpm build:app`은 항상 `bash pyinstaller/build.sh` **이후에** 실행해야 합니다.  
+> `build.sh`가 `src-tauri/binaries/<triple>/`에 사이드카를 스테이징하고  
+> `tauri.conf.json`의 `bundle.resources`를 현재 플랫폼 triple로 자동 패치합니다.
+
+### 테스트 / Tests
+
+```bash
+# Python
 pytest
+
+# UI (Vitest)
+pnpm --dir ui test
+
+# Rust
+cd src-tauri && cargo test
+```
+
+### 주요 디렉터리 / Key directories
+
+```
+.
+├── src/                          # Python 파이프라인 (FSD 구조)
+│   ├── app/main.py               # CLI 진입점 (--url, --check, --sidecar)
+│   └── features/
+│       ├── download/             # yt-dlp 오디오 추출
+│       ├── separation/           # Demucs 추론
+│       ├── ffmpeg_env.py         # 공유 라이브러리 경로 설정
+│       └── progress.py           # NDJSON 이벤트 이미터
+├── src-tauri/src/
+│   ├── lib.rs                    # Tauri 앱 진입점
+│   └── sidecar.rs                # 사이드카 spawn · 이벤트 라우팅 · 취소
+├── ui/src/features/
+│   ├── separate-audio/           # 분리 파이프라인 UI slice
+│   ├── audio-player/             # 멀티트랙 플레이어 slice
+│   └── library/                  # 프로젝트 라이브러리 slice
+├── pyinstaller/
+│   ├── yt-split-py.spec          # PyInstaller 번들 스펙
+│   ├── build.sh                  # macOS/Linux 사이드카 빌드 + 스테이징
+│   └── build.ps1                 # Windows 사이드카 빌드 + 스테이징
+├── .github/workflows/
+│   └── build.yml                 # CI: 4-OS matrix 빌드 + artifact upload
+└── docs/
+    ├── roadmap.md
+    ├── phase-4.md                # 프로덕션 패키징 계획 및 결과
+    └── phase-5.md                # CI/배포 + 코드 서명 계획
 ```
