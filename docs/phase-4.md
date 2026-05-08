@@ -27,7 +27,7 @@ Phase 1~3은 **개발 환경에서만 작동하는 파이프라인**이었다.
 이 섹션은 **리뷰 라운드 후 잠긴(locked) 결정**만 적는다.
 
 - **sidecar_path() 분기:** `cfg!(debug_assertions)` 컴파일 분기를 사용한다. debug(dev) → `env!("CARGO_MANIFEST_DIR")/binaries/yt-split-py-<triple>/<exe>`, release(prod) → `app.path().resource_dir()?/binaries/yt-split-py-<triple>/<exe>`. `sidecar_binary_dir_from_resource(res: &Path) -> PathBuf` 순수 함수를 추출해 단위 테스트 가능하게 한다.
-- **bundle.resources 스테이징:** `build.sh` / `build.ps1`가 이미 `src-tauri/binaries/<triple>/`에 스테이징한다. `tauri.conf.json`에서 `"binaries/yt-split-py-<triple>/**"` glob으로 해당 디렉터리를 번들에 포함한다. 각 플랫폼의 CI/빌드 머신은 자기 triple만 존재하므로, 없는 triple의 glob은 Tauri가 무시한다.
+- **bundle.resources 스테이징:** `build.sh` / `build.ps1`가 이미 `src-tauri/binaries/<triple>/`에 스테이징한다. `tauri.conf.json`에서 빌드 머신에 **실제 존재하는 triple 경로만** 나열한다. Tauri v2는 `bundle.resources`에 나열된 경로가 디스크에 없으면 빌드 자체를 실패시킨다(무시하지 않는다). 따라서 각 플랫폼 빌드는 해당 플랫폼의 triple 하나만 포함해야 하며, 크로스플랫폼 동시 나열은 불가능하다. `tests/test_tauri_conf.py::test_bundle_resources_all_paths_exist`가 이를 방어한다.
 - **\_MEIPASS FFmpeg fallback:** `_search_dirs_ffmpeg_lib()`에 `sys._MEIPASS` (PyInstaller 번들 루트)를 **첫 번째 후보**로 추가한다. 이로써 Homebrew 없는 배포 머신에서도 번들된 dylib/dll을 사용한다.
 - **Windows 취소:** `CREATE_NEW_PROCESS_GROUP` 플래그로 사이드카를 spawn하고, 취소 시 `GenerateConsoleCtrlEvent(CTRL_C_EVENT, pgid)` → 5초 대기 → `TerminateProcess` fallback 순서로 처리한다. `windows-sys` crate 추가.
 - **macOS x86_64:** PyTorch 휠이 아키텍처별로 분리되어 universal2 빌드가 불가능하다. x86_64는 별도 머신(Rosetta 2 또는 x86_64 native runner)에서 별도 빌드한다. Phase 4에서 문서화하고, CI 자동화는 Phase 5에서 처리한다.
@@ -128,10 +128,11 @@ pytest tests/features/test_ffmpeg_env.py -v
 
 ### 변경 파일
 
-| 경로                                                         | 변경                                                                                                                                                                                          |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`src-tauri/tauri.conf.json`](../src-tauri/tauri.conf.json)  | `bundle.resources`에 각 triple glob 추가: `"binaries/yt-split-py-aarch64-apple-darwin/**"`, `"binaries/yt-split-py-x86_64-apple-darwin/**"` 등 4개. 존재하지 않는 triple glob은 Tauri가 무시. |
-| [`README.md`](../README.md) 또는 `docs/build.md` (신규 선택) | 빌드 순서 문서화: ① `bash pyinstaller/build.sh` (사이드카 빌드) → ② `pnpm --dir ui install` → ③ `pnpm build:app`.                                                                             |
+| 경로                                                         | 변경                                                                                                                                                                                                |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`src-tauri/tauri.conf.json`](../src-tauri/tauri.conf.json)  | `bundle.resources`에 현재 빌드 머신의 triple만 나열: `"binaries/yt-split-py-aarch64-apple-darwin"`. Tauri v2는 없는 경로를 무시하지 않고 빌드를 실패시키므로 존재하는 triple 하나만 포함해야 한다.   |
+| [`tests/test_tauri_conf.py`](../tests/test_tauri_conf.py)    | `test_bundle_resources_all_paths_exist` 추가: `bundle.resources` 나열 경로 전체가 디스크에 실제 존재하는지 검증.                                                                                    |
+| [`README.md`](../README.md) 또는 `docs/build.md` (신규 선택) | 빌드 순서 문서화: ① `bash pyinstaller/build.sh` (사이드카 빌드) → ② `pnpm --dir ui install` → ③ `pnpm build:app`.                                                                                  |
 
 ### 인터페이스 노트
 
@@ -316,7 +317,7 @@ pnpm build:app
 | #        | 항목                                     | 옵션                                                                                                 | 현재 추천                                                                                                                                    | 상태         |
 | -------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
 | **OD-1** | Windows 취소 방식                        | (a) `GenerateConsoleCtrlEvent` + `TerminateProcess` fallback (b) Job Object (c) `TerminateProcess`만 | **(a)**. Python signal handler가 없으므로 graceful이 필수는 아니나, Ctrl+C가 더 안전하다.                                                    | **Locked**   |
-| **OD-2** | bundle.resources glob 전략               | (a) 4개 triple glob 모두 나열 (b) 스테이징 폴더(`src-tauri/resources/`) 경유 단일 glob               | **(a)**. 없는 triple glob은 Tauri가 무시. 단순함 우선.                                                                                       | **Locked**   |
+| **OD-2** | bundle.resources glob 전략               | (a) 빌드 머신의 triple만 단독 나열 (b) 스테이징 폴더(`src-tauri/resources/`) 경유 단일 glob           | **(a)**. Tauri v2는 나열된 경로가 없으면 빌드를 실패시킨다. 각 플랫폼 빌드는 자기 triple만 나열해야 한다.                                    | **Locked**   |
 | **OD-3** | Linux FFmpeg so 탐색 강화                | (a) 현행 하드코딩 경로 (b) `ldconfig -p` 파이프라인으로 동적 탐색                                    | **(b)** 추천. `distro` 패키지나 `subprocess.check_output(["ldconfig", "-p"])`로 보완.                                                        | **Open**     |
 | **OD-4** | macOS x86_64 빌드 자동화                 | (a) Phase 4에서 문서화만 (b) Phase 4에서 Rosetta 2 머신 수동 빌드 가이드 (c) Phase 5 CI에 위임       | **(a)+(b)**. x86_64 runner에서 빌드 절차를 문서화하고, CI 자동화는 Phase 5로.                                                                | **Deferred** |
 | **OD-5** | Demucs 모델 가중치 번들 여부             | (a) 사용자 첫 실행 시 다운로드 (~2GB, 현행) (b) 앱 번들에 포함 (앱 크기 +2GB)                        | **(a)**. 번들 크기 급증 대비 효용 없음. 첫 실행 시 진행 표시 UI 개선은 Phase 5+ polish.                                                      | **Locked**   |
@@ -349,7 +350,8 @@ pnpm build:app
 
 ### 2) P4-B 구현
 
-- [ ] `tauri.conf.json` `bundle.resources` 4개 triple glob 추가
+- [x] `tauri.conf.json` `bundle.resources`에 `aarch64-apple-darwin` triple 단독 나열 (Tauri v2가 없는 경로를 거부함을 확인, 존재하는 triple만 포함)
+- [x] `tests/test_tauri_conf.py::test_bundle_resources_all_paths_exist` 추가 (모든 나열 경로 존재 검증)
 - [ ] `pnpm build:app` 빌드 성공 (macOS arm64)
 - [ ] `.app` 설치 후 분리 1회 실행 성공
 - [ ] stems 4개 + 메타 `.json` 생성 확인 (AppLocalData)
@@ -402,9 +404,9 @@ pnpm build:app
 
 ## Quirks (작업 중 채움)
 
-| 증상                         | 원인 | 해결 |
-| ---------------------------- | ---- | ---- |
-| _슬라이스 진행하며 채워나감_ |      |      |
+| 증상                                                                                     | 원인                                                                                                        | 해결                                                                                                                   |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `pnpm build:app` 실패: `resource path 'binaries/yt-split-py-x86_64-...' doesn't exist` | Tauri v2는 `bundle.resources`에 나열된 경로가 디스크에 없으면 빌드를 즉시 중단한다. glob 패턴도 동일하다.   | 빌드 머신에 **실제 존재하는 triple 디렉터리만** `bundle.resources`에 포함할 것. `test_bundle_resources_all_paths_exist`로 방어. |
 
 ---
 
