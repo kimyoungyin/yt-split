@@ -71,12 +71,17 @@ fn sidecar_executable_name() -> &'static str {
     }
 }
 
+/// Returns the sidecar binary directory given a resource_dir root (prod path).
+/// Extracted as a pure function so it can be unit-tested without an AppHandle.
+pub(crate) fn sidecar_binary_dir_from_resource(res: &std::path::Path) -> PathBuf {
+    res.join("binaries")
+        .join(format!("yt-split-py-{}", target_triple()))
+}
+
 /// dev-mode resolver: the sidecar lives under src-tauri/binaries/<triple>/.
 fn sidecar_path() -> PathBuf {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    PathBuf::from(manifest_dir)
-        .join("binaries")
-        .join(format!("yt-split-py-{}", target_triple()))
+    sidecar_binary_dir_from_resource(&PathBuf::from(manifest_dir))
         .join(sidecar_executable_name())
 }
 
@@ -86,7 +91,15 @@ pub async fn run_pipeline(
     state: State<'_, PipelineState>,
     args: PipelineArgs,
 ) -> Result<(), String> {
-    let bin = sidecar_path();
+    let bin = if cfg!(debug_assertions) {
+        sidecar_path()
+    } else {
+        let res = app
+            .path()
+            .resource_dir()
+            .map_err(|e| format!("resource_dir 조회 실패: {e}"))?;
+        sidecar_binary_dir_from_resource(&res).join(sidecar_executable_name())
+    };
     if !bin.exists() {
         return Err(format!(
             "사이드카 바이너리를 찾을 수 없습니다: {}\n먼저 `pyinstaller/build.sh`를 실행하세요.",
@@ -207,5 +220,23 @@ pub async fn cancel_pipeline(state: State<'_, PipelineState>) -> Result<(), Stri
     {
         let _ = pid;
         Err("Windows에서의 사이드카 취소는 Phase 4 패키징 단계에서 추가 예정".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf; 
+
+    #[test]
+    fn sidecar_binary_dir_prod_uses_resource_subpath() {
+        let resource_dir = PathBuf::from("/fake/resources");
+        let dir = sidecar_binary_dir_from_resource(&resource_dir);
+        assert_eq!(
+            dir,
+            PathBuf::from("/fake/resources")
+                .join("binaries")
+                .join(format!("yt-split-py-{}", target_triple()))
+        );
     }
 }
