@@ -10,30 +10,33 @@ def ensure_bundled_ffmpeg_on_path() -> None:
 
 
 def _search_dirs_ffmpeg_lib() -> list[Path]:
+    candidates: list[Path] = []
+    # PyInstaller bundle: dylibs are staged alongside the Python runtime in _MEIPASS.
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass is not None:
+        candidates.append(Path(meipass))
     if sys.platform == "darwin":
-        candidates = [
+        candidates.extend([
             Path("/opt/homebrew/opt/ffmpeg/lib"),   # Homebrew Apple Silicon
             Path("/usr/local/opt/ffmpeg/lib"),       # Homebrew Intel
             Path("/opt/local/lib"),                  # MacPorts
             Path("/usr/local/lib"),                  # source build
-        ]
+        ])
         conda_prefix = os.environ.get("CONDA_PREFIX", "")
         if conda_prefix:
             candidates.append(Path(conda_prefix) / "lib")
-        return candidates
-    if sys.platform.startswith("linux"):
-        candidates = [
+    elif sys.platform.startswith("linux"):
+        candidates.extend([
             Path("/usr/lib/x86_64-linux-gnu"),      # Debian/Ubuntu x86_64
             Path("/usr/lib/aarch64-linux-gnu"),      # Debian/Ubuntu ARM64
             Path("/usr/lib64"),                      # RHEL/Fedora/SUSE
             Path("/usr/lib"),                        # generic
             Path("/usr/local/lib"),                  # source build / Arch
-        ]
+        ])
         conda_prefix = os.environ.get("CONDA_PREFIX", "")
         if conda_prefix:
             candidates.append(Path(conda_prefix) / "lib")
-        return candidates
-    return []
+    return candidates
 
 
 def _dir_has_ffmpeg_shared_libraries(lib_dir: Path) -> bool:

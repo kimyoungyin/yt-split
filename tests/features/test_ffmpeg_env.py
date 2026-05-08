@@ -52,6 +52,25 @@ def test_system_has_ffmpeg_shared_libs_false_when_dirs_lack_libavutil(
     assert system_has_ffmpeg_shared_libs_for_torchcodec() is False
 
 
+def test_ensure_shared_ffmpeg_uses_meipass_first(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """PyInstaller 번들(_MEIPASS)이 있으면 해당 경로를 DYLD_LIBRARY_PATH 첫 번째로 추가한다."""
+    (tmp_path / "libavutil.60.dylib").touch()
+    monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path), raising=False)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.delenv("DYLD_LIBRARY_PATH", raising=False)
+
+    from src.features.ffmpeg_env import ensure_shared_ffmpeg_for_torchcodec
+
+    ensure_shared_ffmpeg_for_torchcodec()
+
+    dyld = os.environ.get("DYLD_LIBRARY_PATH", "")
+    parts = [p for p in dyld.split(os.pathsep) if p]
+    assert parts, "DYLD_LIBRARY_PATH가 비어 있어서는 안 된다"
+    assert str(tmp_path) == parts[0], f"_MEIPASS가 첫 번째여야 한다, 실제: {parts}"
+
+
 def test_ensure_shared_ffmpeg_prepends_brew_ffmpeg_lib_to_dyld_on_darwin(
     monkeypatch, tmp_path: Path
 ) -> None:

@@ -343,9 +343,9 @@ pnpm build:app
 - [x] `sidecar_binary_dir_from_resource(res: &Path) -> PathBuf` 함수 추출
 - [x] `sidecar_path()` debug/release 분기 적용
 - [x] `run_pipeline`이 release 모드에서 `resource_dir`로 경로를 해석하는지 확인 (`cargo check --release` 통과)
-- [ ] `_search_dirs_ffmpeg_lib()`에 `sys._MEIPASS` 첫 후보 추가
+- [x] `_search_dirs_ffmpeg_lib()`에 `sys._MEIPASS` 첫 후보 추가
 - [x] Rust 단위 테스트 `sidecar_binary_dir_prod_uses_resource_subpath` 통과
-- [ ] Python 단위 테스트 `test_ensure_shared_ffmpeg_uses_meipass_first` 통과
+- [x] Python 단위 테스트 `test_ensure_shared_ffmpeg_uses_meipass_first` 통과
 
 ### 2) P4-B 구현
 
