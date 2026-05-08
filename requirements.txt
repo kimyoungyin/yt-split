@@ -6,4 +6,5 @@ demucs
 ffmpeg-python
 static-ffmpeg
 pytest
+pyyaml
 pyinstaller

@@ -419,7 +419,7 @@ pnpm build:app
 
 ## 향후 진행
 
-- **Phase 5** — GitHub Actions matrix 빌드 + tag push 시 자동 release + macOS Developer ID 서명/공증 + Windows (선택) EV 서명.
+- **[Phase 5](./phase-5.md)** — GitHub Actions matrix 빌드 + tag push 시 자동 release + macOS Developer ID 서명/공증 + tauri-plugin-updater 자동 업데이트. P4-C/P4-D의 Windows/Linux 플랫폼 검증도 Phase 5 CI에서 자동 진행.
 
 ---
 
