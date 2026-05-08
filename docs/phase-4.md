@@ -305,8 +305,8 @@ pnpm build:app
 
 ## 결과 (각 슬라이스 완료 시 채움)
 
-- [ ] P4-A 머지: sidecar_path() prod 분기 + \_MEIPASS fallback
-- [ ] P4-B 머지: macOS arm64 .app 패키징 검증 완료
+- [x] P4-A 머지: sidecar_path() prod 분기 + \_MEIPASS fallback
+- [x] P4-B 머지: macOS arm64 .app 패키징 검증 완료
 - [ ] P4-C 머지: Windows 분리·취소 동작 + build.ps1
 - [ ] P4-D 머지: Linux .AppImage 검증 완료
 
@@ -318,7 +318,7 @@ pnpm build:app
 | -------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
 | **OD-1** | Windows 취소 방식                        | (a) `GenerateConsoleCtrlEvent` + `TerminateProcess` fallback (b) Job Object (c) `TerminateProcess`만 | **(a)**. Python signal handler가 없으므로 graceful이 필수는 아니나, Ctrl+C가 더 안전하다.                                                    | **Locked**   |
 | **OD-2** | bundle.resources glob 전략               | (a) 빌드 머신의 triple만 단독 나열 (b) 스테이징 폴더(`src-tauri/resources/`) 경유 단일 glob           | **(a)**. Tauri v2는 나열된 경로가 없으면 빌드를 실패시킨다. 각 플랫폼 빌드는 자기 triple만 나열해야 한다.                                    | **Locked**   |
-| **OD-3** | Linux FFmpeg so 탐색 강화                | (a) 현행 하드코딩 경로 (b) `ldconfig -p` 파이프라인으로 동적 탐색                                    | **(b)** 추천. `distro` 패키지나 `subprocess.check_output(["ldconfig", "-p"])`로 보완.                                                        | **Open**     |
+| **OD-3** | Linux FFmpeg so 탐색 강화                | (a) 현행 하드코딩 경로 (b) `ldconfig -p` 파이프라인으로 동적 탐색                                    | **(b)** 구현 완료. 하드코딩 경로 4개를 먼저 순회한 뒤 미탐지 시 `subprocess.check_output(["ldconfig", "-p"])`로 fallback.                    | **Locked**   |
 | **OD-4** | macOS x86_64 빌드 자동화                 | (a) Phase 4에서 문서화만 (b) Phase 4에서 Rosetta 2 머신 수동 빌드 가이드 (c) Phase 5 CI에 위임       | **(a)+(b)**. x86_64 runner에서 빌드 절차를 문서화하고, CI 자동화는 Phase 5로.                                                                | **Deferred** |
 | **OD-5** | Demucs 모델 가중치 번들 여부             | (a) 사용자 첫 실행 시 다운로드 (~2GB, 현행) (b) 앱 번들에 포함 (앱 크기 +2GB)                        | **(a)**. 번들 크기 급증 대비 효용 없음. 첫 실행 시 진행 표시 UI 개선은 Phase 5+ polish.                                                      | **Locked**   |
 | **OD-6** | `pnpm build:app` 전 사이드카 빌드 자동화 | (a) `beforeBuildCommand`에 `bash pyinstaller/build.sh` 추가 (b) 별도 단계로 문서화                   | **(b)**. 사이드카 빌드는 5~10분 + Python 환경 필요. `beforeBuildCommand`로 자동화하면 항상 재빌드되어 느림. Phase 5 CI에서 캐싱과 함께 처리. | **Locked**   |
@@ -333,11 +333,12 @@ pnpm build:app
 
 ### 0) OD 잠금 (구현 전)
 
-- [ ] **OD-1 잠금:** Windows 취소 방식 확정
-- [ ] **OD-2 잠금:** bundle.resources glob 전략 확정
-- [ ] **OD-5 잠금:** 모델 가중치 번들 미포함 확정
-- [ ] **OD-6 잠금:** 빌드 단계 분리(수동) 확정
-- [ ] **OD-7 잠금:** Windows FFmpeg DLL 소스 확정
+- [x] **OD-1 잠금:** Windows 취소 방식 확정 (GenerateConsoleCtrlEvent + TerminateProcess fallback)
+- [x] **OD-2 잠금:** bundle.resources glob 전략 확정 (빌드 머신 triple 단독 + build.sh/build.ps1 auto-patch)
+- [x] **OD-3 잠금:** Linux FFmpeg so 탐색 강화 (하드코딩 경로 + ldconfig -p fallback)
+- [x] **OD-5 잠금:** 모델 가중치 번들 미포함 확정
+- [x] **OD-6 잠금:** 빌드 단계 분리(수동) 확정
+- [x] **OD-7 잠금:** Windows FFmpeg DLL 소스 확정 (FFmpeg full-shared 사전 설치)
 
 ### 1) P4-A 구현
 
@@ -352,35 +353,37 @@ pnpm build:app
 
 - [x] `tauri.conf.json` `bundle.resources`에 `aarch64-apple-darwin` triple 단독 나열 (Tauri v2가 없는 경로를 거부함을 확인, 존재하는 triple만 포함)
 - [x] `tests/test_tauri_conf.py::test_bundle_resources_all_paths_exist` 추가 (모든 나열 경로 존재 검증)
-- [ ] `pnpm build:app` 빌드 성공 (macOS arm64)
-- [ ] `.app` 설치 후 분리 1회 실행 성공
-- [ ] stems 4개 + 메타 `.json` 생성 확인 (AppLocalData)
-- [ ] Player WAV 재생 확인 (assetProtocol)
-- [ ] 실행권한 보존 확인 (`-rwxr-xr-x`)
+- [x] `pnpm build:app` 빌드 성공 (macOS arm64)
+- [x] `.app` 설치 후 분리 1회 실행 성공
+- [x] stems 4개 + 메타 `.json` 생성 확인 (AppLocalData)
+- [x] Player WAV 재생 확인 (assetProtocol)
+- [x] 실행권한 보존 확인 (`-rwxr-xr-x`)
 
 ### 3) P4-C 구현 (Windows 머신)
 
-- [ ] `Cargo.toml`에 `windows-sys` 의존성 추가
-- [ ] `run_pipeline` Windows spawn에 `CREATE_NEW_PROCESS_GROUP` 추가
-- [ ] `cancel_pipeline` Windows 구현 (GenerateConsoleCtrlEvent → TerminateProcess)
-- [ ] `build.ps1` 작성 + 실행 확인
-- [ ] spec Windows FFmpeg DLL 수집 추가
-- [ ] `cargo build --target x86_64-pc-windows-msvc` 성공
-- [ ] `.exe/.msi` 분리·취소 수동 검증
+- [x] `Cargo.toml`에 `windows-sys = "0.52"` 의존성 추가 (`Win32_System_Threading`, `Win32_Foundation`, `Win32_System_Console`)
+- [x] `run_pipeline` Windows spawn에 `CREATE_NEW_PROCESS_GROUP` (0x200) 추가
+- [x] `cancel_pipeline` Windows 구현 (`cancel_windows`: GenerateConsoleCtrlEvent → 5s poll → TerminateProcess, `PROCESS_TERMINATE | SYNCHRONIZE`, `spawn_blocking`으로 async 스레드 블로킹 방지)
+- [x] `build.ps1` 작성 (스테이징 + tauri.conf.json auto-patch, BOM-free UTF-8)
+- [x] spec `_ffmpeg_lib_dir()` Windows FFmpeg DLL(`avutil-*.dll` 등) 수집 분기 추가
+- [ ] `cargo build --target x86_64-pc-windows-msvc` 성공 (Windows 머신 필요)
+- [ ] `.exe/.msi` 분리·취소 수동 검증 (Windows 머신 필요)
 
 ### 4) P4-D 구현 (Linux 머신)
 
-- [ ] `tauri.conf.json`에 Linux triple glob 확인 (P4-B에서 함께 처리)
-- [ ] Ubuntu 22.04에서 `bash pyinstaller/build.sh` 성공
-- [ ] `.AppImage` 분리 1회 수동 검증
+- [x] spec `_ffmpeg_lib_dir()` Linux ldconfig -p fallback 추가 (OD-3 완료)
+- [x] `build.sh` Linux triple 자동 처리 + tauri.conf.json auto-patch (P4-C 작업에서 포함)
+- [ ] Ubuntu 22.04에서 `bash pyinstaller/build.sh` 성공 (Linux 머신 필요)
+- [ ] `.AppImage` 분리 1회 수동 검증 (Linux 머신 필요)
 
 ### 5) 검증/문서 동기화
 
-- [ ] `pytest tests/features/test_ffmpeg_env.py tests/features/test_project.py tests/app/test_pipeline.py -v` 통과
-- [ ] `(cd src-tauri && PATH="$HOME/.cargo/bin:$PATH" cargo test)` 통과
-- [ ] `pnpm --dir ui test` 통과 (회귀 없음)
+- [x] `pytest tests/features/test_ffmpeg_env.py tests/features/test_project.py -v` 통과 (27/27; test_pipeline.py는 실제 네트워크/모델 필요 — Phase 5 CI에서 처리)
+- [x] `pytest tests/test_tauri_conf.py -v` 통과 (7/7; 플랫폼 인식 + 구조 검증 포함)
+- [x] `(cd src-tauri && PATH="$HOME/.cargo/bin:$PATH" cargo test)` 통과
+- [x] `pnpm --dir ui test` 통과 (회귀 없음)
 - [ ] `build.sh` / `build.ps1` + `pnpm build:app` 순서 README 문서화
-- [ ] 이 문서의 `## 결과` 체크박스 갱신
+- [x] 이 문서의 `## 결과` 체크박스 갱신
 
 ---
 
@@ -398,7 +401,9 @@ pnpm build:app
 
 ## Lessons applied
 
-`~/.claude/lessons/Users-kim-young-yin-Documents-codes-yt-split/`: **none yet** (Phase 3 사이클에서 생성 예정).
+`~/.claude/lessons/Users-kim-young-yin-Documents-codes-yt-split/`:
+
+- **`2026-05-09-cfg-windows-api-pre-flight-checklist.md`**: `#[cfg(windows)]` 게이트 코드는 macOS에서 컴파일 스킵되므로 Plan 단계에 Windows API 체크리스트(접근 권한, blocking/async 경계, 인코딩)를 사전 열거해야 한다. P4-C에서 `SYNCHRONIZE` 누락 + `spawn_blocking` 미적용 + PowerShell BOM 이슈가 Review에서 일괄 발견된 경험에서 추출.
 
 ---
 
@@ -407,6 +412,8 @@ pnpm build:app
 | 증상                                                                                     | 원인                                                                                                        | 해결                                                                                                                   |
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `pnpm build:app` 실패: `resource path 'binaries/yt-split-py-x86_64-...' doesn't exist` | Tauri v2는 `bundle.resources`에 나열된 경로가 디스크에 없으면 빌드를 즉시 중단한다. glob 패턴도 동일하다.   | 빌드 머신에 **실제 존재하는 triple 디렉터리만** `bundle.resources`에 포함할 것. `test_bundle_resources_all_paths_exist`로 방어. |
+| `windows-sys` feature 오류: `package does not have that feature` | `windows-sys 0.52`의 Console 관련 feature는 `Win32_Console`이 아니라 `Win32_System_Console`이다. | `Cargo.toml` features 목록에 정확한 경로 형식(`Win32_System_*`) 사용. |
+| `ConvertTo-Json -Depth 10` JSON indent 포맷이 기존과 달라짐 | PowerShell `ConvertTo-Json`은 기본 depth 2, indent 스타일이 다를 수 있다. | `-Depth 10`으로 nested 구조 보존. `Set-Content -Encoding UTF8`로 BOM 없이 저장. |
 
 ---
 

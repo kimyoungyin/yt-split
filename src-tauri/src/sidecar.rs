@@ -134,10 +134,19 @@ pub async fn run_pipeline(
         cmd_args.push(stem);
     }
 
-    let mut child = Command::new(&bin)
-        .args(&cmd_args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+    let mut cmd = Command::new(&bin);
+    cmd.args(&cmd_args).stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    // Windows: launch in a new process group so GenerateConsoleCtrlEvent can
+    // target the sidecar without affecting the Tauri host process.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+        cmd.creation_flags(CREATE_NEW_PROCESS_GROUP);
+    }
+
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("사이드카 spawn 실패: {e}"))?;
 
@@ -217,10 +226,42 @@ pub async fn cancel_pipeline(state: State<'_, PipelineState>) -> Result<(), Stri
     }
 
     #[cfg(windows)]
-    {
-        let _ = pid;
-        Err("Windows에서의 사이드카 취소는 Phase 4 패키징 단계에서 추가 예정".into())
-    }
+    cancel_windows(pid).await
+}
+
+#[cfg(windows)]
+async fn cancel_windows(pid: u32) -> Result<(), String> {
+    // WaitForSingleObject(5000) blocks for up to 5 s — run on a dedicated
+    // blocking thread so the tokio async runtime is not stalled.
+    tokio::task::spawn_blocking(move || {
+        use windows_sys::Win32::Foundation::CloseHandle;
+        use windows_sys::Win32::System::Console::GenerateConsoleCtrlEvent;
+        use windows_sys::Win32::System::Threading::{
+            OpenProcess, TerminateProcess, WaitForSingleObject, PROCESS_TERMINATE, SYNCHRONIZE,
+        };
+
+        unsafe {
+            // 1. Ctrl+C to the process group (pgid == pid for CREATE_NEW_PROCESS_GROUP).
+            GenerateConsoleCtrlEvent(0 /* CTRL_C_EVENT */, pid);
+
+            // 2. Wait up to 5 s for graceful exit.
+            // SYNCHRONIZE is required by WaitForSingleObject; PROCESS_TERMINATE for TerminateProcess.
+            let handle = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, 0, pid);
+            if handle == 0 {
+                // Process already gone — treat as success.
+                return Ok(());
+            }
+            let wait = WaitForSingleObject(handle, 5000);
+            if wait != 0 {
+                // 3. Still alive — force terminate.
+                TerminateProcess(handle, 1);
+            }
+            CloseHandle(handle);
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("spawn_blocking join error: {e}"))?
 }
 
 #[cfg(test)]

@@ -35,3 +35,18 @@ rm -rf "${TAURI_BIN_DIR}/${DIST_NAME}"
 cp -R "dist/${DIST_NAME}" "${TAURI_BIN_DIR}/"
 
 echo "[build] staged: ${TAURI_BIN_DIR}/${DIST_NAME}/yt-split-py"
+
+# Patch tauri.conf.json bundle.resources to the current platform triple so
+# `pnpm build:app` includes exactly this sidecar folder and nothing else.
+# Tauri v2 fails the build if a listed resource path does not exist on disk.
+CONF="${ROOT}/src-tauri/tauri.conf.json"
+python3 - <<PYEOF
+import json
+with open("${CONF}") as f:
+    conf = json.load(f)
+conf["bundle"]["resources"] = ["binaries/yt-split-py-${TRIPLE}"]
+with open("${CONF}", "w") as f:
+    json.dump(conf, f, indent=4)
+    f.write("\n")
+PYEOF
+echo "[build] patched tauri.conf.json bundle.resources → binaries/yt-split-py-${TRIPLE}"

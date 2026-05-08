@@ -48,6 +48,20 @@ def _ffmpeg_lib_dir() -> str | None:
         for candidate in ("/opt/homebrew/opt/ffmpeg/lib", "/usr/local/opt/ffmpeg/lib"):
             if os.path.isdir(candidate):
                 return candidate
+    if sys.platform == "win32":
+        # Windows "full-shared" FFmpeg build: DLLs live under bin/.
+        # Install via: choco install ffmpeg  or  scoop install ffmpeg
+        candidates = [
+            r"C:\ffmpeg\bin",
+            r"C:\Program Files\ffmpeg\bin",
+            os.path.join(os.environ.get("LOCALAPPDATA", ""), "ffmpeg", "bin"),
+            os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "ffmpeg", "bin"),
+        ]
+        for c in candidates:
+            if os.path.isdir(c) and any(
+                f.startswith("avutil") and f.endswith(".dll") for f in os.listdir(c)
+            ):
+                return c
     if sys.platform.startswith("linux"):
         for candidate in (
             "/usr/lib/x86_64-linux-gnu",
@@ -55,25 +69,49 @@ def _ffmpeg_lib_dir() -> str | None:
             "/usr/lib64",
             "/usr/lib",
         ):
-            if os.path.isfile(os.path.join(candidate, "libavutil.so")) or any(
+            if os.path.isdir(candidate) and any(
                 f.startswith("libavutil") for f in os.listdir(candidate)
             ):
                 return candidate
+        # ldconfig -p fallback for non-standard distro layouts (OD-3)
+        try:
+            import subprocess
+            out = subprocess.check_output(
+                ["ldconfig", "-p"], text=True, stderr=subprocess.DEVNULL
+            )
+            for line in out.splitlines():
+                if "libavutil" in line and "=>" in line:
+                    lib_path = line.split("=>")[-1].strip()
+                    return os.path.dirname(lib_path)
+        except Exception:
+            pass
     return None
 
 
 _ffmpeg_dir = _ffmpeg_lib_dir()
 if _ffmpeg_dir:
-    suffix = ".dylib" if sys.platform == "darwin" else ".so"
-    for fname in os.listdir(_ffmpeg_dir):
-        if fname.endswith(suffix) and (
-            fname.startswith("libav")
-            or fname.startswith("libsw")
-            or fname.startswith("libpost")
-        ):
-            full = os.path.join(_ffmpeg_dir, fname)
-            if os.path.exists(full):
-                binaries.append((full, "."))
+    if sys.platform == "win32":
+        # Windows DLL names: avutil-59.dll, avcodec-61.dll, etc. (no "lib" prefix)
+        for fname in os.listdir(_ffmpeg_dir):
+            if fname.endswith(".dll") and (
+                fname.startswith("av")
+                or fname.startswith("sw")
+                or fname.startswith("postproc")
+            ):
+                full = os.path.join(_ffmpeg_dir, fname)
+                if os.path.exists(full):
+                    binaries.append((full, "."))
+    else:
+        suffix = ".dylib" if sys.platform == "darwin" else ".so"
+        for fname in os.listdir(_ffmpeg_dir):
+            if fname.endswith(suffix) and (
+                fname.startswith("libav")
+                or fname.startswith("libsw")
+                or fname.startswith("libpost")
+            ):
+                full = os.path.join(_ffmpeg_dir, fname)
+                if os.path.exists(full):
+                    binaries.append((full, "."))
 
 a = Analysis(
     ["../src/app/main.py"],
