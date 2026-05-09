@@ -69,14 +69,9 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install ffmpeg -y
 
-      - uses: actions/cache@v4
+      - uses: swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target/release
-          key: cargo-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-
+          workspaces: src-tauri -> target
 
       - uses: actions/cache@v4
         with:

@@ -70,14 +70,9 @@ jobs:
 
       # 캐시: cargo registry + target/release, pnpm node_modules
       # pip는 setup-python의 cache: pip가 플랫폼별 경로를 자동 처리함
-      - uses: actions/cache@v4
+      - uses: swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target/release
-          key: cargo-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-
+          workspaces: src-tauri -> target
 
       - uses: actions/cache@v4
         with:
@@ -86,7 +81,11 @@ jobs:
 
       # 빌드
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            pip install torch --index-url https://download.pytorch.org/whl/cpu
+          fi
+          pip install -r requirements.txt
 
       - name: Build sidecar (PyInstaller)
         run: ${{ matrix.sidecar_cmd }}
