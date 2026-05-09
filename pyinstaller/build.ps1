@@ -51,6 +51,7 @@ $CONF = Join-Path $ROOT "src-tauri\tauri.conf.json"
 $conf = Get-Content $CONF -Raw | ConvertFrom-Json
 $conf.bundle.resources = @("binaries/yt-split-py-$TRIPLE")
 $jsonContent = $conf | ConvertTo-Json -Depth 10
-Set-Content -Path $CONF -Value $jsonContent -Encoding UTF8
+$bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($jsonContent + "`n")
+[System.IO.File]::WriteAllBytes($CONF, $bytes)
 
 Write-Host "[build] patched tauri.conf.json bundle.resources → binaries/yt-split-py-$TRIPLE"
