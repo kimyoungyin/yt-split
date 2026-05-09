@@ -80,12 +80,12 @@ jobs:
           key: pnpm-${{ runner.os }}-${{ hashFiles('ui/pnpm-lock.yaml') }}
 
       # 빌드
+      - name: Pre-install CPU-only torch (Linux CI)
+        if: runner.os == 'Linux'
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
       - name: Install Python dependencies
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            pip install torch --index-url https://download.pytorch.org/whl/cpu
-          fi
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Build sidecar (PyInstaller)
         run: ${{ matrix.sidecar_cmd }}
