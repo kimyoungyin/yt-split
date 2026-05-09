@@ -50,10 +50,9 @@ Write-Host "[build] staged: $stageTarget\yt-split-py.exe"
 $CONF = Join-Path $ROOT "src-tauri\tauri.conf.json"
 $conf = Get-Content $CONF -Raw | ConvertFrom-Json
 $conf.bundle.resources = @("binaries/yt-split-py-$TRIPLE")
-# Use UTF8NoBOM explicitly — Set-Content -Encoding UTF8 emits BOM in PS 5.x,
-# which breaks Tauri's JSON parser.
-$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+# Use the 2-arg overload — .NET Core (pwsh 7) WriteAllText defaults to UTF-8 no-BOM.
+# The 3-arg form with New-Object UTF8Encoding fails overload resolution on pwsh 7.
 $jsonContent = $conf | ConvertTo-Json -Depth 10
-[System.IO.File]::WriteAllText($CONF, $jsonContent + "`n", $utf8NoBom)
+[System.IO.File]::WriteAllText($CONF, $jsonContent + "`n")
 
 Write-Host "[build] patched tauri.conf.json bundle.resources → binaries/yt-split-py-$TRIPLE"
