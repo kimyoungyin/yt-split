@@ -47,11 +47,11 @@ Write-Host "[build] staged: $stageTarget\yt-split-py.exe"
 # Patch tauri.conf.json bundle.resources to the current platform triple so
 # `pnpm build:app` includes exactly this sidecar folder and nothing else.
 # Tauri v2 fails the build if a listed resource path does not exist on disk.
-$CONF = Join-Path $ROOT "src-tauri\tauri.conf.json"
-$conf = Get-Content $CONF -Raw | ConvertFrom-Json
+$confPath = Join-Path $ROOT "src-tauri\tauri.conf.json"
+$conf = Get-Content $confPath -Raw | ConvertFrom-Json
 $conf.bundle.resources = @("binaries/yt-split-py-$TRIPLE")
 $jsonContent = $conf | ConvertTo-Json -Depth 10
 $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($jsonContent + "`n")
-[System.IO.File]::WriteAllBytes($CONF, $bytes)
+[System.IO.File]::WriteAllBytes($confPath, $bytes)
 
 Write-Host "[build] patched tauri.conf.json bundle.resources → binaries/yt-split-py-$TRIPLE"
