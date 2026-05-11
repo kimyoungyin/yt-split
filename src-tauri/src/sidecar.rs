@@ -141,7 +141,6 @@ pub async fn run_pipeline(
     // target the sidecar without affecting the Tauri host process.
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
         cmd.creation_flags(CREATE_NEW_PROCESS_GROUP);
     }
@@ -237,7 +236,8 @@ async fn cancel_windows(pid: u32) -> Result<(), String> {
         use windows_sys::Win32::Foundation::CloseHandle;
         use windows_sys::Win32::System::Console::GenerateConsoleCtrlEvent;
         use windows_sys::Win32::System::Threading::{
-            OpenProcess, TerminateProcess, WaitForSingleObject, PROCESS_TERMINATE, SYNCHRONIZE,
+            OpenProcess, TerminateProcess, WaitForSingleObject, PROCESS_SYNCHRONIZE,
+            PROCESS_TERMINATE,
         };
 
         unsafe {
@@ -245,8 +245,9 @@ async fn cancel_windows(pid: u32) -> Result<(), String> {
             GenerateConsoleCtrlEvent(0 /* CTRL_C_EVENT */, pid);
 
             // 2. Wait up to 5 s for graceful exit.
-            // SYNCHRONIZE is required by WaitForSingleObject; PROCESS_TERMINATE for TerminateProcess.
-            let handle = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, 0, pid);
+            // PROCESS_SYNCHRONIZE is required by WaitForSingleObject;
+            // PROCESS_TERMINATE is required by TerminateProcess.
+            let handle = OpenProcess(PROCESS_TERMINATE | PROCESS_SYNCHRONIZE, 0, pid);
             if handle == 0 {
                 // Process already gone — treat as success.
                 return Ok(());
