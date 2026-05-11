@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "tauri": "pnpm --dir ui exec tauri",
-    "dev": "pnpm --dir ui exec tauri dev",
-    "build:app": "pnpm --dir ui exec tauri build"
+    "tauri": "node ui/node_modules/@tauri-apps/cli/tauri.js",
+    "dev": "node ui/node_modules/@tauri-apps/cli/tauri.js dev",
+    "build:app": "node ui/node_modules/@tauri-apps/cli/tauri.js build"
   }
 }
