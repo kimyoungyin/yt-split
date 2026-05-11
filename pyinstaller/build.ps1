@@ -11,6 +11,7 @@
 $ErrorActionPreference = "Stop"
 
 $TRIPLE = "x86_64-pc-windows-msvc"
+$BUNDLE_TARGETS = @("nsis", "msi")
 
 # Resolve repo root regardless of where the script is invoked from.
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -44,14 +45,16 @@ Copy-Item -Recurse -Path $dstDist -Destination $stageTarget
 
 Write-Host "[build] staged: $stageTarget\yt-split-py.exe"
 
-# Patch tauri.conf.json bundle.resources to the current platform triple so
-# `pnpm build:app` includes exactly this sidecar folder and nothing else.
+# Patch tauri.conf.json bundle settings to the current platform triple so
+# `pnpm build:app` includes exactly this sidecar folder and supported bundle types.
 # Tauri v2 fails the build if a listed resource path does not exist on disk.
 $confPath = Join-Path $ROOT "src-tauri\tauri.conf.json"
 $conf = Get-Content $confPath -Raw | ConvertFrom-Json
 $conf.bundle.resources = @("binaries/yt-split-py-$TRIPLE")
+$conf.bundle.targets = $BUNDLE_TARGETS
 $jsonContent = $conf | ConvertTo-Json -Depth 10
 $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($jsonContent + "`n")
 [System.IO.File]::WriteAllBytes($confPath, $bytes)
 
 Write-Host "[build] patched tauri.conf.json bundle.resources → binaries/yt-split-py-$TRIPLE"
+Write-Host "[build] patched tauri.conf.json bundle.targets → $($BUNDLE_TARGETS -join ',')"

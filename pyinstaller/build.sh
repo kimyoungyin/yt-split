@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Build the yt-split-py sidecar with PyInstaller and stage it under
-# src-tauri/binaries/<target-triple>/ for Tauri's externalBin lookup.
+# src-tauri/binaries/<target-triple>/ for Tauri's bundle.resources lookup.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
 case "$(uname -s)-$(uname -m)" in
-  Darwin-arm64)   TRIPLE="aarch64-apple-darwin" ;;
-  Darwin-x86_64)  TRIPLE="x86_64-apple-darwin" ;;
-  Linux-x86_64)   TRIPLE="x86_64-unknown-linux-gnu" ;;
-  Linux-aarch64)  TRIPLE="aarch64-unknown-linux-gnu" ;;
+  Darwin-arm64)   TRIPLE="aarch64-apple-darwin"; BUNDLE_TARGETS='["dmg"]' ;;
+  Darwin-x86_64)  TRIPLE="x86_64-apple-darwin"; BUNDLE_TARGETS='["dmg"]' ;;
+  Linux-x86_64)   TRIPLE="x86_64-unknown-linux-gnu"; BUNDLE_TARGETS='["deb"]' ;;
+  Linux-aarch64)  TRIPLE="aarch64-unknown-linux-gnu"; BUNDLE_TARGETS='["deb"]' ;;
   *)
     echo "Unsupported platform: $(uname -s)-$(uname -m)" >&2
     exit 1
@@ -36,8 +36,8 @@ cp -R "dist/${DIST_NAME}" "${TAURI_BIN_DIR}/"
 
 echo "[build] staged: ${TAURI_BIN_DIR}/${DIST_NAME}/yt-split-py"
 
-# Patch tauri.conf.json bundle.resources to the current platform triple so
-# `pnpm build:app` includes exactly this sidecar folder and nothing else.
+# Patch tauri.conf.json bundle settings to the current platform triple so
+# `pnpm build:app` includes exactly this sidecar folder and supported bundle types.
 # Tauri v2 fails the build if a listed resource path does not exist on disk.
 CONF="${ROOT}/src-tauri/tauri.conf.json"
 python3 - <<PYEOF
@@ -45,8 +45,10 @@ import json
 with open("${CONF}") as f:
     conf = json.load(f)
 conf["bundle"]["resources"] = ["binaries/yt-split-py-${TRIPLE}"]
+conf["bundle"]["targets"] = ${BUNDLE_TARGETS}
 with open("${CONF}", "w") as f:
     json.dump(conf, f, indent=4)
     f.write("\n")
 PYEOF
 echo "[build] patched tauri.conf.json bundle.resources → binaries/yt-split-py-${TRIPLE}"
+echo "[build] patched tauri.conf.json bundle.targets → ${BUNDLE_TARGETS}"

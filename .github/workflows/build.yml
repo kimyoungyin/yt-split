@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_call:
+    inputs:
+      app_version:
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build:
@@ -14,9 +20,6 @@ jobs:
         include:
           - os: macos-14
             target: aarch64-apple-darwin
-            sidecar_cmd: bash pyinstaller/build.sh
-          - os: macos-13
-            target: x86_64-apple-darwin
             sidecar_cmd: bash pyinstaller/build.sh
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
@@ -80,6 +83,23 @@ jobs:
           key: pnpm-${{ runner.os }}-${{ hashFiles('ui/pnpm-lock.yaml') }}
 
       # 빌드
+      - name: Sync app version from workflow input
+        if: ${{ inputs.app_version != '' }}
+        env:
+          APP_VERSION: ${{ inputs.app_version }}
+        run: |
+          python -c "
+          import json, os
+          version = os.environ['APP_VERSION'].lstrip('v')
+          with open('src-tauri/tauri.conf.json') as f:
+              conf = json.load(f)
+          conf['version'] = version
+          with open('src-tauri/tauri.conf.json', 'w') as f:
+              json.dump(conf, f, indent=4)
+              f.write('\n')
+          print('version ->', version)
+          "
+
       - name: Pre-install CPU-only torch (Linux CI)
         if: runner.os == 'Linux'
         run: pip install torch --index-url https://download.pytorch.org/whl/cpu
@@ -106,4 +126,4 @@ jobs:
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/deb/*.deb
-          if-no-files-found: ignore
+          if-no-files-found: error
